@@ -1,0 +1,6 @@
+{
+  "name": "NMDC Donimalai Training & Safety Portal",
+  "description": "Training, MVT Compliance, Competency, Statutory DGMS Compliance and Safety Management Portal for NMDC Limited Donimalai Complex.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,163 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 1. Employees Collection
+    match /employees/{employeeId} {
+      function isValidEmployee(data) {
+        return data.keys().hasAll(['id', 'name', 'employeeType', 'department', 'designation', 'employmentStatus', 'classification', 'verificationStatus'])
+          && data.id is string && data.id.size() <= 128
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 120
+          && (data.employeeType == 'NMDC_REGULAR' || data.employeeType == 'CONTRACT_WORKER')
+          && data.department is string && data.department.size() <= 100
+          && data.designation is string && data.designation.size() <= 100
+          && (data.employmentStatus == 'ACTIVE' || data.employmentStatus == 'INACTIVE' || data.employmentStatus == 'SUSPENDED')
+          && (data.verificationStatus == 'Pending Verification' || data.verificationStatus == 'Verified' || data.verificationStatus == 'Rejected' || data.verificationStatus == 'Expired');
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(employeeId)
+        && isValidEmployee(incoming())
+        && incoming().id == employeeId;
+      allow update: if isSignedIn()
+        && isValidId(employeeId)
+        && isValidEmployee(incoming())
+        && incoming().id == existing().id;
+      allow delete: if isSignedIn() && isValidId(employeeId);
+    }
+
+    // 2. Contractors Collection
+    match /contractors/{contractorId} {
+      function isValidContractor(data) {
+        return data.keys().hasAll(['id', 'code', 'name', 'workOrderNumber', 'contractStatus'])
+          && data.id is string && data.id.size() <= 128
+          && data.code is string && data.code.size() <= 50
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 150
+          && data.workOrderNumber is string && data.workOrderNumber.size() <= 80
+          && (data.contractStatus == 'Active' || data.contractStatus == 'Pending Renewal' || data.contractStatus == 'Expired' || data.contractStatus == 'Suspended');
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(contractorId)
+        && isValidContractor(incoming())
+        && incoming().id == contractorId;
+      allow update: if isSignedIn()
+        && isValidId(contractorId)
+        && isValidContractor(incoming())
+        && incoming().id == existing().id;
+      allow delete: if isSignedIn() && isValidId(contractorId);
+    }
+
+    // 3. Training Sessions Collection
+    match /trainingSessions/{sessionId} {
+      function isValidTrainingSession(data) {
+        return data.keys().hasAll(['id', 'programId', 'title', 'date', 'status'])
+          && data.id is string && data.id.size() <= 128
+          && data.programId is string && data.programId.size() <= 50
+          && data.title is string && data.title.size() > 0 && data.title.size() <= 150
+          && data.date is string && data.date.size() <= 20
+          && (data.status == 'SCHEDULED' || data.status == 'IN_PROGRESS' || data.status == 'COMPLETED' || data.status == 'CANCELLED');
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(sessionId)
+        && isValidTrainingSession(incoming())
+        && incoming().id == sessionId;
+      allow update: if isSignedIn()
+        && isValidId(sessionId)
+        && isValidTrainingSession(incoming())
+        && incoming().id == existing().id;
+      allow delete: if isSignedIn() && isValidId(sessionId);
+    }
+
+    // 4. Statutory Requirements Collection
+    match /statutoryRequirements/{requirementId} {
+      function isValidStatutory(data) {
+        return data.keys().hasAll(['id', 'actCode', 'ruleRegulation', 'status'])
+          && data.id is string && data.id.size() <= 128
+          && data.actCode is string && data.actCode.size() <= 150
+          && data.ruleRegulation is string && data.ruleRegulation.size() <= 150
+          && (data.status == 'ACTIVE' || data.status == 'SUPERSEDED' || data.status == 'PENDING_VERIFICATION' || data.status == 'ARCHIVED');
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(requirementId)
+        && isValidStatutory(incoming())
+        && incoming().id == requirementId;
+      allow update: if isSignedIn()
+        && isValidId(requirementId)
+        && isValidStatutory(incoming())
+        && incoming().id == existing().id;
+      allow delete: if isSignedIn() && isValidId(requirementId);
+    }
+
+    // 5. Audit Logs Collection (Append-only)
+    match /auditLogs/{logId} {
+      function isValidAuditLog(data) {
+        return data.keys().hasAll(['id', 'timestamp', 'userName', 'userRole', 'action', 'entity'])
+          && data.id is string && data.id.size() <= 128
+          && data.timestamp is string && data.timestamp.size() <= 50
+          && data.userName is string && data.userName.size() <= 100
+          && data.userRole is string && data.userRole.size() <= 80
+          && data.action is string && data.action.size() <= 80
+          && data.entity is string && data.entity.size() <= 80;
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(logId)
+        && isValidAuditLog(incoming())
+        && incoming().id == logId;
+      allow update, delete: if false; // Audit logs are tamper-evident and immutable
+    }
+
+    // 6. Certificates Collection
+    match /certificates/{certificateId} {
+      function isValidCertificate(data) {
+        return data.keys().hasAll(['id', 'certificateNumber', 'workerId', 'issueDate', 'status'])
+          && data.id is string && data.id.size() <= 128
+          && data.certificateNumber is string && data.certificateNumber.size() <= 80
+          && data.workerId is string && data.workerId.size() <= 80
+          && data.issueDate is string && data.issueDate.size() <= 30
+          && (data.status == 'VALID' || data.status == 'EXPIRED' || data.status == 'REVOKED');
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(certificateId)
+        && isValidCertificate(incoming())
+        && incoming().id == certificateId;
+      allow update: if isSignedIn()
+        && isValidId(certificateId)
+        && isValidCertificate(incoming())
+        && incoming().id == existing().id;
+      allow delete: if isSignedIn() && isValidId(certificateId);
+    }
+  }
+}

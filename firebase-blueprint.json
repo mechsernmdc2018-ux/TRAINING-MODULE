@@ -1,0 +1,167 @@
+{
+  "entities": {
+    "Employee": {
+      "title": "Employee",
+      "description": "Mine personnel record for NMDC regular employees and contractor workmen",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique personnel identifier" },
+        "name": { "type": "string", "maxLength": 120, "description": "Full name of the worker" },
+        "photoUrl": { "type": "string", "maxLength": 500, "description": "Photo or avatar URL" },
+        "dateOfBirth": { "type": "string", "maxLength": 20, "description": "Date of birth YYYY-MM-DD" },
+        "mobile": { "type": "string", "maxLength": 25, "description": "Contact mobile number" },
+        "email": { "type": "string", "maxLength": 120, "description": "Official or personal email" },
+        "department": { "type": "string", "maxLength": 100, "description": "Operational department" },
+        "section": { "type": "string", "maxLength": 100, "description": "Work section or unit" },
+        "designation": { "type": "string", "maxLength": 100, "description": "Designation or title" },
+        "trade": { "type": "string", "maxLength": 100, "description": "Technical trade or skill" },
+        "grade": { "type": "string", "maxLength": 50, "description": "Wage or pay grade" },
+        "employeeType": { "type": "string", "enum": ["NMDC_REGULAR", "CONTRACT_WORKER"], "description": "Employment type" },
+        "dateOfJoining": { "type": "string", "maxLength": 20, "description": "Date joined mine" },
+        "dateOfDeployment": { "type": "string", "maxLength": 20, "description": "Date deployed to work area" },
+        "shift": { "type": "string", "maxLength": 60, "description": "Operational work shift" },
+        "supervisor": { "type": "string", "maxLength": 120, "description": "Reporting supervisor or foreman" },
+        "workLocation": { "type": "string", "maxLength": 120, "description": "Physical work location" },
+        "mine": { "type": "string", "maxLength": 100, "description": "Mine name" },
+        "employmentStatus": { "type": "string", "enum": ["ACTIVE", "INACTIVE", "SUSPENDED"], "description": "Employment status" },
+        "classification": { "type": "string", "maxLength": 60, "description": "Worker trade classification" },
+        "contractorCode": { "type": "string", "maxLength": 50, "description": "Contractor registration code" },
+        "contractorName": { "type": "string", "maxLength": 150, "description": "Contracting company name" },
+        "workOrderNumber": { "type": "string", "maxLength": 80, "description": "Work order number" },
+        "verificationStatus": { "type": "string", "enum": ["Pending Verification", "Verified", "Rejected", "Expired"], "description": "Identity verification status" },
+        "medicalFitnessDate": { "type": "string", "maxLength": 20, "description": "Date of medical examination" },
+        "medicalFitnessValidTill": { "type": "string", "maxLength": 20, "description": "Medical fitness validity expiry" },
+        "bloodGroup": { "type": "string", "maxLength": 10, "description": "Blood group" },
+        "emergencyContactName": { "type": "string", "maxLength": 100, "description": "Emergency contact person" },
+        "emergencyContactMobile": { "type": "string", "maxLength": 25, "description": "Emergency contact phone" },
+        "aadhaarNumber": { "type": "string", "maxLength": 20, "description": "Aadhaar identification number" }
+      },
+      "required": ["id", "name", "employeeType", "department", "designation", "employmentStatus", "classification", "verificationStatus"]
+    },
+    "Contractor": {
+      "title": "Contractor",
+      "description": "Contracting agency providing specialized services or equipment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique contractor identifier" },
+        "code": { "type": "string", "maxLength": 50, "description": "Contractor company code" },
+        "name": { "type": "string", "maxLength": 150, "description": "Company name" },
+        "workOrderNumber": { "type": "string", "maxLength": 80, "description": "Current work order number" },
+        "workOrderStartDate": { "type": "string", "maxLength": 20, "description": "Work order start date" },
+        "workOrderEndDate": { "type": "string", "maxLength": 20, "description": "Work order end date" },
+        "scopeOfWork": { "type": "string", "maxLength": 300, "description": "Scope of contractual operations" },
+        "department": { "type": "string", "maxLength": 80, "description": "Executing department" },
+        "contractManager": { "type": "string", "maxLength": 100, "description": "Manager designation" },
+        "safetyOfficer": { "type": "string", "maxLength": 100, "description": "Safety officer designation" },
+        "representative": { "type": "string", "maxLength": 100, "description": "Authorized representative designation" },
+        "contactNumber": { "type": "string", "maxLength": 30, "description": "Contact telephone" },
+        "email": { "type": "string", "maxLength": 120, "description": "Official email" },
+        "approvedManpower": { "type": "number", "description": "Sanctioned manpower quota" },
+        "currentManpower": { "type": "number", "description": "Active deployed workers count" },
+        "contractStatus": { "type": "string", "enum": ["Active", "Pending Renewal", "Expired", "Suspended"], "description": "Contract status" }
+      },
+      "required": ["id", "code", "name", "workOrderNumber", "contractStatus"]
+    },
+    "TrainingSession": {
+      "title": "TrainingSession",
+      "description": "MVT or Safety vocational training batch and attendance schedule",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Session identifier" },
+        "programId": { "type": "string", "maxLength": 50, "description": "Associated training program" },
+        "title": { "type": "string", "maxLength": 150, "description": "Training batch title" },
+        "date": { "type": "string", "maxLength": 20, "description": "Session date" },
+        "startTime": { "type": "string", "maxLength": 10, "description": "Start time HH:mm" },
+        "endTime": { "type": "string", "maxLength": 10, "description": "End time HH:mm" },
+        "venue": { "type": "string", "maxLength": 100, "description": "Training hall or simulator venue" },
+        "trainerName": { "type": "string", "maxLength": 100, "description": "Trainer designation or title" },
+        "trainerType": { "type": "string", "maxLength": 80, "description": "Category of trainer" },
+        "capacity": { "type": "number", "description": "Maximum batch size" },
+        "status": { "type": "string", "enum": ["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"], "description": "Session progress status" },
+        "qrCodeToken": { "type": "string", "maxLength": 100, "description": "Digital attendance QR token" },
+        "createdAt": { "type": "string", "maxLength": 40, "description": "Creation timestamp" }
+      },
+      "required": ["id", "programId", "title", "date", "status"]
+    },
+    "StatutoryRequirement": {
+      "title": "StatutoryRequirement",
+      "description": "DGMS circular, Mines Act regulation or statutory refresher mandate",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Requirement identifier" },
+        "actCode": { "type": "string", "maxLength": 150, "description": "Statutory Act or Rules" },
+        "ruleRegulation": { "type": "string", "maxLength": 150, "description": "Rule or regulation reference" },
+        "dgmsReference": { "type": "string", "maxLength": 150, "description": "DGMS circular citation" },
+        "circularNumber": { "type": "string", "maxLength": 100, "description": "Circular number" },
+        "trainingRequirement": { "type": "string", "maxLength": 400, "description": "Mandatory training scope" },
+        "frequencyMonths": { "type": "number", "description": "Frequency in months" },
+        "validityMonths": { "type": "number", "description": "Validity period in months" },
+        "minimumDurationHours": { "type": "number", "description": "Required hours" },
+        "responsibleDepartment": { "type": "string", "maxLength": 100, "description": "Department in charge" },
+        "status": { "type": "string", "enum": ["ACTIVE", "SUPERSEDED", "PENDING_VERIFICATION", "ARCHIVED"], "description": "Statutory status" }
+      },
+      "required": ["id", "actCode", "ruleRegulation", "status"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Tamper-evident audit record of statutory and administrative operations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Audit record ID" },
+        "timestamp": { "type": "string", "maxLength": 40, "description": "Timestamp of action" },
+        "userName": { "type": "string", "maxLength": 100, "description": "Officer title who performed action" },
+        "userRole": { "type": "string", "maxLength": 80, "description": "Role of user" },
+        "action": { "type": "string", "maxLength": 80, "description": "Operation performed" },
+        "entity": { "type": "string", "maxLength": 80, "description": "Entity modified" },
+        "entityId": { "type": "string", "maxLength": 80, "description": "ID of affected entity" },
+        "details": { "type": "string", "maxLength": 500, "description": "Narrative details" }
+      },
+      "required": ["id", "timestamp", "userName", "userRole", "action", "entity"]
+    },
+    "Certificate": {
+      "title": "Certificate",
+      "description": "Issued digital training certificate for MVT or HEMM",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Certificate ID" },
+        "certificateNumber": { "type": "string", "maxLength": 60, "description": "Official certificate serial number" },
+        "workerId": { "type": "string", "maxLength": 50, "description": "Candidate worker ID" },
+        "workerName": { "type": "string", "maxLength": 120, "description": "Candidate name" },
+        "trainingTitle": { "type": "string", "maxLength": 150, "description": "Course title" },
+        "category": { "type": "string", "maxLength": 80, "description": "Training category" },
+        "issueDate": { "type": "string", "maxLength": 20, "description": "Issue date" },
+        "validUntil": { "type": "string", "maxLength": 20, "description": "Validity expiry date" },
+        "durationHours": { "type": "number", "description": "Training duration hours" },
+        "trainerName": { "type": "string", "maxLength": 100, "description": "Instructor title" },
+        "status": { "type": "string", "enum": ["VALID", "EXPIRED", "REVOKED"], "description": "Certificate validity status" }
+      },
+      "required": ["id", "certificateNumber", "workerId", "issueDate", "status"]
+    }
+  },
+  "firestore": {
+    "/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Personnel records for regular staff and contractor workmen"
+    },
+    "/contractors/{contractorId}": {
+      "schema": "Contractor",
+      "description": "Registered contracting agencies and active work orders"
+    },
+    "/trainingSessions/{sessionId}": {
+      "schema": "TrainingSession",
+      "description": "MVT and specialized safety training batches"
+    },
+    "/statutoryRequirements/{requirementId}": {
+      "schema": "StatutoryRequirement",
+      "description": "DGMS compliance mandates and vocational rules"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Statutory compliance and user action audit trail"
+    },
+    "/certificates/{certificateId}": {
+      "schema": "Certificate",
+      "description": "Issued digital safety and MVT qualification certificates"
+    }
+  }
+}
