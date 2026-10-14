@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp, OFFICIAL_USERS, ActiveTab } from '../context/AppContext';
+import { NMDCLogo } from './NMDCLogo';
 import {
   ShieldAlert,
   Search,
@@ -19,6 +20,10 @@ import {
   Cloud,
   LogIn,
   LogOut,
+  Stethoscope,
+  GraduationCap,
+  FileSpreadsheet,
+  UserPlus,
 } from 'lucide-react';
 
 interface PrimaryNavGroup {
@@ -44,6 +49,12 @@ export const Header: React.FC = () => {
     isCloudSyncActive,
     signInWithGoogle,
     signOutFirebase,
+    allUsers,
+    setIsLoginModalOpen,
+    selectedLease,
+    setSelectedLease,
+    setAuthScreen,
+    logoutUser,
   } = useApp();
 
   const [showRoleMenu, setShowRoleMenu] = useState(false);
@@ -51,7 +62,7 @@ export const Header: React.FC = () => {
   const [showJumpMenu, setShowJumpMenu] = useState(false);
   const [quickPassportInput, setQuickPassportInput] = useState('');
 
-  // Primary 6 intuitive categories
+  // Primary intuitive navigation categories
   const primaryNavGroups: PrimaryNavGroup[] = [
     {
       id: 'group-dashboard',
@@ -69,11 +80,33 @@ export const Header: React.FC = () => {
       badge: kpis.mvtOverdue > 0 ? kpis.mvtOverdue : undefined,
     },
     {
+      id: 'group-medical',
+      label: 'Medical (IME/PME)',
+      icon: <Stethoscope className="w-4 h-4" />,
+      defaultTab: 'medical',
+      tabIds: ['medical'],
+      badge: kpis.medicalOverdueCount > 0 ? kpis.medicalOverdueCount : undefined,
+    },
+    {
+      id: 'group-other-training',
+      label: 'Other Training',
+      icon: <GraduationCap className="w-4 h-4" />,
+      defaultTab: 'other-training',
+      tabIds: ['other-training'],
+    },
+    {
       id: 'group-workforce',
       label: 'Workforce',
       icon: <Users className="w-4 h-4" />,
       defaultTab: 'workforce',
       tabIds: ['workforce'],
+    },
+    {
+      id: 'group-excel-upload',
+      label: 'Excel Upload',
+      icon: <FileSpreadsheet className="w-4 h-4" />,
+      defaultTab: 'excel-upload',
+      tabIds: ['excel-upload'],
     },
     {
       id: 'group-training',
@@ -103,6 +136,20 @@ export const Header: React.FC = () => {
     string,
     { id: ActiveTab; label: string; icon: React.ReactNode; badge?: number }[]
   > = {
+    'group-workforce': [
+      {
+        id: 'workforce',
+        label: 'Personnel Master Register',
+        icon: <Users className="w-3.5 h-3.5" />,
+      },
+    ],
+    'group-excel-upload': [
+      {
+        id: 'excel-upload',
+        label: 'Bulk Excel Upload Facility',
+        icon: <FileSpreadsheet className="w-3.5 h-3.5" />,
+      },
+    ],
     'group-mvt': [
       {
         id: 'mvt-command',
@@ -192,8 +239,8 @@ export const Header: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           {/* NMDC Brand Emblem & Clean Title */}
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center shadow-xs text-slate-950 font-black text-base tracking-tight border border-amber-400 shrink-0">
-              NMDC
+            <div className="h-12 w-12 rounded-xl bg-white flex items-center justify-center shadow-xs border border-slate-200 shrink-0 p-0.5">
+              <NMDCLogo className="h-full w-auto" showText={true} />
             </div>
             <div>
               <div className="flex items-center space-x-2">
@@ -201,30 +248,71 @@ export const Header: React.FC = () => {
                   Navratna PSU
                 </span>
                 <span className="text-xs font-semibold text-slate-500">
-                  Donimalai Complex • Mine Code: 29/03/DNM
+                  Donimalai Complex • {selectedLease === 'DIOM ML 2396' ? 'Donimalai Mine (Code: 29/03/DNM)' : 'Kumaraswamy Mine (Code: 29/03/KWM)'}
+                </span>
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200">
+                  {selectedLease}
                 </span>
               </div>
               <h1 className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 leading-tight">
-                NMDC LIMITED • TRAINING & SAFETY MANAGEMENT PORTAL
+                NMDC LIMITED • <span className="text-amber-800">{selectedLease}</span> • TRAINING & SAFETY MANAGEMENT PORTAL
               </h1>
-              <div className="text-[11px] text-slate-500 hidden sm:flex items-center gap-1.5">
+              <div className="text-[11px] text-slate-500 hidden sm:flex items-center gap-1.5 flex-wrap">
                 <span>Training</span>
                 <span>·</span>
                 <span>MVT Compliance</span>
                 <span>·</span>
                 <span>Competency</span>
                 <span>·</span>
-                <span>DGMS Statutory Compliance</span>
-                <span>·</span>
-                <span>Safety</span>
+                <span>DGMS Compliance</span>
+                <span className="text-slate-300">|</span>
+                <span className="text-amber-950 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/80 text-[10.5px]">
+                  Concept by <strong className="text-slate-950">Anil Kumar CGM (Prod.)</strong>, Designed and Developed by <strong className="text-amber-900">Abhishek Singh</strong>, <span className="text-amber-600 font-bold">•</span>
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Right Action Tools: Search, Passport, Role Switcher */}
+          {/* Right Action Tools: Search, Lease Switcher, Passport, Role Switcher */}
           <div className="flex items-center flex-wrap gap-2">
+            {/* Operational Mining Lease Switcher Tabs */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-300 shadow-xs">
+              <button
+                type="button"
+                onClick={() => setSelectedLease('DIOM ML 2396')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  selectedLease === 'DIOM ML 2396'
+                    ? 'bg-amber-500 text-slate-950 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+                title="Active Mining Lease: Donimalai (ML 2396)"
+              >
+                DIOM ML 2396
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedLease('KIOM ML 1111')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  selectedLease === 'KIOM ML 1111'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                }`}
+                title="Active Mining Lease: Kumaraswamy (ML 1111)"
+              >
+                KIOM ML 1111
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthScreen('LEASE_SELECTION')}
+                className="text-[11px] font-bold text-slate-500 hover:text-amber-800 px-1.5 py-1 rounded hover:bg-slate-200 cursor-pointer"
+                title="Change Lease View"
+              >
+                Change
+              </button>
+            </div>
+
             {/* Search Input */}
-            <div className="relative min-w-[170px] sm:min-w-[200px]">
+            <div className="relative min-w-[150px] sm:min-w-[180px]">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -243,6 +331,17 @@ export const Header: React.FC = () => {
             >
               <HardHat className="w-3.5 h-3.5 text-amber-700" />
               <span className="hidden md:inline">Verify</span> Passport
+            </button>
+
+            {/* Sign Out Button */}
+            <button
+              type="button"
+              onClick={() => logoutUser()}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-700 rounded-lg border border-slate-200 hover:border-red-300 text-xs font-bold transition-colors cursor-pointer shadow-xs"
+              title="Sign Out to Login Page"
+            >
+              <LogOut className="w-3.5 h-3.5 text-slate-500 hover:text-red-600" />
+              <span className="hidden xl:inline">Sign Out</span>
             </button>
 
             {/* Firebase Cloud Firestore Sync & Google Auth */}
@@ -274,6 +373,16 @@ export const Header: React.FC = () => {
               </button>
             )}
 
+            {/* User Login & Registration Button */}
+            <button
+              onClick={() => setIsLoginModalOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-amber-400 rounded-lg border border-slate-700 shadow-xs transition-colors cursor-pointer"
+              title="Sign In or Register Personnel Profile"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden md:inline">User</span> Login / Register
+            </button>
+
             {/* Official Officer Profile Switcher Dropdown */}
             <div className="relative">
               <button
@@ -302,16 +411,31 @@ export const Header: React.FC = () => {
               {/* Role Dropdown */}
               {showRoleMenu && (
                 <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg py-2 z-50">
-                  <div className="px-3 py-1.5 border-b border-slate-100">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-800">
-                      AUTHORIZED OFFICER PROFILES
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      Switch executive role to review permissions:
-                    </p>
+                  <div className="px-3 py-2 border-b border-slate-100 bg-amber-50/60 flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-800">
+                        PERSONNEL ACCOUNTS
+                      </p>
+                      <p className="text-[10px] text-slate-500">
+                        Logged in as {currentUser.name}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsLoginModalOpen(true);
+                        setShowRoleMenu(false);
+                      }}
+                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      Manage / Register
+                    </button>
+                  </div>
+                  <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Switch Active Session Profile:
                   </div>
                   <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
-                    {OFFICIAL_USERS.map((user) => (
+                    {(allUsers && allUsers.length > 0 ? allUsers : OFFICIAL_USERS).map((user) => (
                       <button
                         key={user.id}
                         onClick={() => {
@@ -329,7 +453,7 @@ export const Header: React.FC = () => {
                             {user.role}
                           </div>
                           <div className="text-[11px] text-amber-700 font-medium">
-                            {user.designation}
+                            {user.name} • {user.designation}
                           </div>
                           <div className="text-[10px] text-slate-500 truncate max-w-[200px]">
                             Dept: {user.department}
@@ -405,6 +529,8 @@ export const Header: React.FC = () => {
                       { id: 'dashboard', label: 'Executive Dashboard' },
                       { id: 'mvt-command', label: 'MVT Command Centre' },
                       { id: 'deployment', label: 'Gate Clearance & Overrides' },
+                      { id: 'medical', label: 'Medical Examination (IME / PME)' },
+                      { id: 'other-training', label: 'Other Training (OEM / Int / Ext / Global)' },
                       { id: 'workforce', label: 'Workforce (Employees & Contractors)' },
                       { id: 'training', label: 'Training Sessions & Assessment' },
                       { id: 'competency', label: 'HEMM Operator Competency' },

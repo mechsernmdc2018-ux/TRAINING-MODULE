@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { useApp } from '../context/AppContext';
 import {
   Users,
@@ -10,8 +11,14 @@ import {
   Building,
   Upload,
   Eye,
+  CheckCircle2,
+  AlertTriangle,
+  FileCheck,
+  RefreshCw,
+  XCircle,
+  HelpCircle,
 } from 'lucide-react';
-import { Employee, WorkerClassification } from '../types';
+import { Employee, WorkerClassification, ExcelImportRow } from '../types';
 import { getPersonnelAvatar } from '../utils/avatarUtils';
 
 export const EmployeeManagement: React.FC = () => {
@@ -20,6 +27,7 @@ export const EmployeeManagement: React.FC = () => {
     contractors,
     addEmployee,
     addContractWorker,
+    bulkImportEmployees,
     exportToCSV,
     filterAlertScope,
     setViewPassportWorkerId,
@@ -32,6 +40,7 @@ export const EmployeeManagement: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [deptFilter, setDeptFilter] = useState('ALL');
   const [classFilter, setClassFilter] = useState('ALL');
+  const [feedbackToast, setFeedbackToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // Modals
   const [showAddEmpModal, setShowAddEmpModal] = useState(false);
@@ -39,12 +48,18 @@ export const EmployeeManagement: React.FC = () => {
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [selectedWorkerDetail, setSelectedWorkerDetail] = useState<Employee | null>(null);
 
-  // Bulk Import State
-  const [bulkImportResults, setBulkImportResults] = useState<{
-    total: number;
-    success: number;
+  // Master Excel Import State
+  const [previewRows, setPreviewRows] = useState<ExcelImportRow[]>([]);
+  const [isUpdateMode, setIsUpdateMode] = useState(true);
+  const [importSummary, setImportSummary] = useState<{
+    inserted: number;
+    updated: number;
+    skipped: number;
+    rejected: number;
     errors: { row: number; error: string }[];
   } | null>(null);
+  const [isImportCommitted, setIsImportCommitted] = useState(false);
+  const [importFileName, setImportFileName] = useState('');
 
   // Add Regular Employee Form State
   const [empName, setEmpName] = useState('');
@@ -136,7 +151,10 @@ export const EmployeeManagement: React.FC = () => {
     });
 
     setShowAddEmpModal(false);
-    alert(`Regular Employee successfully registered (ID: ${newEmp.id}). MVT tracking initialized!`);
+    setFeedbackToast({
+      message: `Regular Employee registered successfully (ID: ${newEmp.id}). Statutory MVT tracking initialized!`,
+      type: 'success',
+    });
   };
 
   const handleAddContractWorkerSubmit = (e: React.FormEvent) => {
@@ -169,7 +187,10 @@ export const EmployeeManagement: React.FC = () => {
     });
 
     setShowAddContractWorkerModal(false);
-    alert(`Contract Worker registered (ID: ${newWorker.id}). Placed under 'Pending Verification' awaiting Safety Induction.`);
+    setFeedbackToast({
+      message: `Contract Worker registered (ID: ${newWorker.id}). Placed under 'Pending Verification' awaiting Safety Induction.`,
+      type: 'info',
+    });
   };
 
   const handleExportWorkforce = () => {
@@ -189,111 +210,266 @@ export const EmployeeManagement: React.FC = () => {
     exportToCSV('NMDC_Donimalai_Workforce_Register', headers, rows);
   };
 
-  const handleDownloadSampleCSV = () => {
-    const headers = ['Name', 'EmployeeType', 'DateOfBirth', 'Mobile', 'Department', 'Designation', 'Trade', 'Classification', 'MedicalFitnessValidTill', 'ContractorCode'];
-    const sampleRows = [
-      ['[Candidate Full Name]', 'NMDC_REGULAR', '1990-01-01', '+91 90000 00000', 'Mining', 'Heavy Machinery Operator', 'HEMM Driving', 'HEMM Operator', '2027-04-01', ''],
-      ['[Contract Worker Full Name]', 'CONTRACT_WORKER', '1992-05-15', '+91 90000 00001', 'Mining', 'Tipper Driver', 'Commercial Driving', 'Operator', '2027-05-01', 'NMDC-CONT-DM-01'],
+  // Requirement 4: Excel (.xlsx) Template Generator
+  const handleDownloadExcelTemplate = () => {
+    const wb = XLSX.utils.book_new();
+    const templateData = [
+      [
+        'EmployeeID',
+        'Name',
+        'EmployeeType',
+        'DateOfBirth',
+        'Mobile',
+        'Email',
+        'Department',
+        'Section',
+        'Designation',
+        'Trade',
+        'Grade',
+        'Shift',
+        'WorkLocation',
+        'MedicalFitnessValidTill',
+        'ContractorName',
+        'WorkOrderNumber',
+      ],
+      [
+        'NMDC-EMP-001',
+        'Rajesh Kumar Verma',
+        'NMDC_REGULAR',
+        '1976-08-14',
+        '+91 94481 12301',
+        'r.verma@nmdc.co.in',
+        'Mining',
+        'Pit-1 Quarry',
+        'Deputy General Manager (Mining)',
+        'Mining Engineering',
+        'E-06',
+        'General (09:00-17:30)',
+        'Donimalai Mine Pit-1 Quarry',
+        '2026-04-10',
+        '',
+        '',
+      ],
+      [
+        'CONT-WRK-001',
+        'Manjunath Kuruba',
+        'CONTRACT_WORKER',
+        '1993-06-18',
+        '+91 98451 67856',
+        'm.kuruba@deccanearthmovers.in',
+        'Mining',
+        'Overburden Handling South Block',
+        'Contract Tipper Driver',
+        'Commercial Heavy Driving',
+        'Contract-Skilled',
+        'Shift A (06:00-14:00)',
+        'Donimalai Pit Operations',
+        '2027-04-05',
+        'M/s Deccan Earthmovers & Mining Infra Pvt Ltd',
+        'WO/NMDC/DNM/MIN/2024/118',
+      ],
+      [
+        '',
+        '[Instructions]: Use EmployeeID for matching updates. Leave EmployeeID blank for automatic new ID assignment. EmployeeType must be NMDC_REGULAR or CONTRACT_WORKER.',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+      ],
     ];
-    exportToCSV('NMDC_Workforce_Import_Template', headers, sampleRows);
+
+    const ws = XLSX.utils.aoa_to_sheet(templateData);
+    XLSX.utils.book_append_sheet(wb, ws, 'Workforce_Template');
+    XLSX.writeFile(wb, 'NMDC_Donimalai_Employee_Master_Template.xlsx');
   };
 
-  const handleProcessCSV = (csvText: string) => {
-    const lines = csvText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    if (lines.length <= 1) {
-      alert('CSV file contains no data rows.');
+  // Requirement 4: File Validation, Upload-Size Limits, and Multi-Format (.xlsx, .xls, .csv) Parsing
+  const handleProcessExcelFile = (file: File) => {
+    // 10MB limit
+    if (file.size > 10 * 1024 * 1024) {
+      setFeedbackToast({
+        message: 'File size exceeds 10MB limit. Please upload a smaller file.',
+        type: 'error',
+      });
       return;
     }
 
-    const dataRows = lines.slice(1);
-    let successCount = 0;
-    const errors: { row: number; error: string }[] = [];
+    setImportFileName(file.name);
+    setIsImportCommitted(false);
+    setImportSummary(null);
 
-    dataRows.forEach((line, index) => {
-      const rowNum = index + 2;
-      const parts = line.split(',').map((p) => p.trim().replace(/^["']|["']$/g, ''));
-      if (parts.length < 5) {
-        errors.push({ row: rowNum, error: 'Insufficient columns. Expected at least Name, Type, DOB, Mobile, Department.' });
-        return;
-      }
-
-      const [name, rawType, dob, mobile, dept, desig, trade, classification, medValid, contCode] = parts;
-
-      if (!name) {
-        errors.push({ row: rowNum, error: 'Worker name is missing.' });
-        return;
-      }
-
-      const isContract = rawType?.toUpperCase().includes('CONTRACT');
-      const empClassification: WorkerClassification = (classification as WorkerClassification) || (isContract ? 'Operator' : 'HEMM Operator');
-      const medicalDate = medValid || '2027-04-01';
-
+    const reader = new FileReader();
+    reader.onload = (e) => {
       try {
-        if (!isContract) {
-          addEmployee({
-            name,
-            photoUrl: getPersonnelAvatar(name, 'REGULAR'),
-            dateOfBirth: dob || '1990-01-01',
-            mobile: mobile || '+91 94480 00000',
-            email: `${name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@nmdc.co.in`,
-            department: dept || 'Mining',
-            section: 'Donimalai Mine Operations',
-            designation: desig || 'Operative',
-            trade: trade || 'Mining Support',
-            grade: 'W-04',
-            employeeType: 'NMDC_REGULAR',
-            dateOfJoining: '2026-10-08',
-            dateOfDeployment: '2026-10-09',
-            shift: 'Shift A (06:00-14:00)',
-            supervisor: 'Foreman Incharge',
-            workLocation: 'Donimalai Complex',
-            mine: 'Donimalai Iron Ore Mine',
-            employmentStatus: 'ACTIVE',
-            classification: empClassification,
-            verificationStatus: 'Verified',
-            medicalFitnessDate: '2026-04-01',
-            medicalFitnessValidTill: medicalDate,
-          });
-        } else {
-          const contractor = contractors.find((c) => c.code === contCode) || contractors[0];
-          addContractWorker({
-            name,
-            photoUrl: getPersonnelAvatar(name, 'CONTRACT'),
-            dateOfBirth: dob || '1992-05-15',
-            mobile: mobile || '+91 98860 00000',
-            email: `${name.toLowerCase().replace(/[^a-z0-9]/g, '')}@contractor.in`,
-            department: dept || 'Mining',
-            section: 'Contractual Mining Work Order',
-            designation: desig || 'Contract Worker',
-            trade: trade || 'General Driving',
-            grade: 'Contract-Skilled',
-            dateOfJoining: '2026-10-08',
-            dateOfDeployment: '2026-10-10',
-            shift: 'Shift A (06:00-14:00)',
-            supervisor: contractor?.safetyOfficer || 'Contractor Supervisor',
-            workLocation: 'Donimalai Pit Operations',
-            mine: 'Donimalai Iron Ore Mine',
-            employmentStatus: 'ACTIVE',
-            classification: empClassification,
-            contractorCode: contractor?.code || 'NMDC-CONT-DM-01',
-            contractorName: contractor?.name || 'Contractor Agency',
-            workOrderNumber: contractor?.workOrderNumber || 'WO/NMDC/2026',
-            verificationStatus: 'Pending Verification',
-            medicalFitnessDate: '2026-04-01',
-            medicalFitnessValidTill: medicalDate,
-          });
-        }
-        successCount++;
-      } catch (err: any) {
-        errors.push({ row: rowNum, error: err.message || 'Error creating worker record.' });
-      }
-    });
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rawJson: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-    setBulkImportResults({
-      total: dataRows.length,
-      success: successCount,
-      errors,
-    });
+        if (rawJson.length === 0) {
+          setFeedbackToast({
+            message: 'Uploaded spreadsheet is empty. Please use the NMDC template.',
+            type: 'error',
+          });
+          return;
+        }
+
+        const parsedRows: ExcelImportRow[] = [];
+
+        rawJson.forEach((row, index) => {
+          const rowNum = index + 2;
+
+          // Normalize keys (trim and case-insensitive check)
+          const getVal = (keyNames: string[]): string => {
+            for (const k of Object.keys(row)) {
+              if (keyNames.some((kn) => kn.toLowerCase() === k.trim().toLowerCase())) {
+                return String(row[k]).trim();
+              }
+            }
+            return '';
+          };
+
+          const rawEmpId = getVal(['EmployeeID', 'WorkerID', 'ID', 'EmpID']);
+          const rawName = getVal(['Name', 'WorkerName', 'FullName', 'EmployeeName']);
+          const rawType = getVal(['EmployeeType', 'Type', 'WorkerType']);
+          const rawDob = getVal(['DateOfBirth', 'DOB', 'BirthDate']);
+          const rawMobile = getVal(['Mobile', 'Phone', 'ContactNumber']);
+          const rawEmail = getVal(['Email', 'EmailAddress']);
+          const rawDept = getVal(['Department', 'Dept']);
+          const rawSection = getVal(['Section', 'MineSection']);
+          const rawDesig = getVal(['Designation', 'Desig']);
+          const rawTrade = getVal(['Trade']);
+          const rawGrade = getVal(['Grade']);
+          const rawShift = getVal(['Shift']);
+          const rawLoc = getVal(['WorkLocation', 'Location']);
+          const rawMedValid = getVal(['MedicalFitnessValidTill', 'MedicalValidTill', 'MedicalDate']);
+          const rawContName = getVal(['ContractorName', 'Contractor']);
+          const rawWorkOrder = getVal(['WorkOrderNumber', 'WorkOrder']);
+
+          // Skip instructions row if present
+          if (rawName.startsWith('[Instructions]')) return;
+
+          const rowErrors: string[] = [];
+
+          if (!rawName) {
+            rowErrors.push('Worker Name is required');
+          }
+          if (!rawDept) {
+            rowErrors.push('Department is required');
+          }
+
+          const isContract =
+            rawType.toUpperCase().includes('CONTRACT') ||
+            (rawContName && rawContName.length > 0) ||
+            rawEmpId.startsWith('CONT-');
+
+          const empType = isContract ? 'CONTRACT_WORKER' : 'NMDC_REGULAR';
+
+          // Match by Employee ID
+          const existingEmployee = rawEmpId ? employees.find((e) => e.id.toLowerCase() === rawEmpId.toLowerCase()) : undefined;
+
+          let status: ExcelImportRow['status'] = 'INSERT';
+          let action = 'New Record Insert';
+
+          if (rowErrors.length > 0) {
+            status = 'INVALID';
+            action = 'Validation Error';
+          } else if (existingEmployee) {
+            status = 'UPDATE';
+            action = 'Update Existing (Preserves Linked Records)';
+          } else {
+            status = 'INSERT';
+            action = 'New Employee Insert';
+          }
+
+          parsedRows.push({
+            rowNumber: rowNum,
+            status,
+            action,
+            employeeId: rawEmpId,
+            name: rawName,
+            employeeType: empType,
+            workerCategory: empType === 'NMDC_REGULAR' ? 'REGULAR_WORKMAN' : 'CONTRACTOR_WORKMAN',
+            department: rawDept || 'Mining',
+            section: rawSection || 'Donimalai Mine Operations',
+            designation: rawDesig || 'Operative',
+            trade: rawTrade || 'General Mining',
+            grade: rawGrade || (empType === 'NMDC_REGULAR' ? 'W-04' : 'Contract-Skilled'),
+            dateOfBirth: rawDob || '1990-01-01',
+            mobile: rawMobile || '+91 94480 00000',
+            email: rawEmail || `${rawName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@nmdc.co.in`,
+            shift: (rawShift as any) || 'Shift A (06:00-14:00)',
+            workLocation: rawLoc || 'Donimalai Complex',
+            contractorName: rawContName || (isContract ? 'Contractor Agency' : undefined),
+            workOrderNumber: rawWorkOrder || (isContract ? 'WO/NMDC/2026' : undefined),
+            medicalFitnessValidTill: rawMedValid || '2027-04-01',
+            errors: rowErrors,
+            existingRecord: existingEmployee,
+          });
+        });
+
+        setPreviewRows(parsedRows);
+      } catch (err: any) {
+        setFeedbackToast({
+          message: `Failed to parse Excel file: ${err.message || 'Corrupted file'}`,
+          type: 'error',
+        });
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  // Commit Import
+  const handleCommitImport = async () => {
+    if (previewRows.length === 0) return;
+
+    try {
+      const result = await bulkImportEmployees(previewRows, isUpdateMode);
+      setImportSummary({
+        inserted: result.inserted,
+        updated: result.updated,
+        skipped: result.skipped,
+        rejected: result.rejected,
+        errors: result.errors,
+      });
+      setIsImportCommitted(true);
+      setFeedbackToast({
+        message: `Import committed successfully: ${result.inserted} inserted, ${result.updated} updated, ${result.skipped} skipped, ${result.rejected} rejected. Linked records preserved.`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      setFeedbackToast({
+        message: `Database import error: ${err.message || 'Transaction failed'}`,
+        type: 'error',
+      });
+    }
+  };
+
+  // Download Row-Level Error Report
+  const handleDownloadErrorReport = () => {
+    const errorRows = previewRows.filter((r) => r.status === 'INVALID' || r.errors.length > 0);
+    if (errorRows.length === 0) return;
+
+    const wb = XLSX.utils.book_new();
+    const data = [
+      ['RowNumber', 'EmployeeID', 'Name', 'Department', 'Errors'],
+      ...errorRows.map((r) => [r.rowNumber, r.employeeId || 'N/A', r.name || 'N/A', r.department || 'N/A', r.errors.join('; ')]),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Error_Exceptions');
+    XLSX.writeFile(wb, `NMDC_Import_Error_Report_${Date.now()}.xlsx`);
   };
 
   return (
@@ -338,11 +514,11 @@ export const EmployeeManagement: React.FC = () => {
             </button>
             <button
               onClick={() => setShowBulkImportModal(true)}
-              className="px-3 py-2 text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Bulk Excel / CSV Import"
+              className="px-3.5 py-2 text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title="Bulk Excel Sheet Upload - Statutory Alternative to Individual Employee Registration"
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              <span>EXCEL IMPORT</span>
+              <span>EXCEL REGISTRATION (BULK)</span>
             </button>
             <button
               onClick={handleExportWorkforce}
@@ -352,6 +528,25 @@ export const EmployeeManagement: React.FC = () => {
               <Download className="w-4 h-4" />
             </button>
           </div>
+        </div>
+
+        {/* Statutory Registration Alternative Notice */}
+        <div className="mt-3 p-2.5 bg-emerald-50/70 border border-emerald-200/80 rounded-lg flex items-center justify-between text-xs text-emerald-900 gap-2">
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold text-[10px] bg-emerald-200 text-emerald-950 px-2 py-0.5 rounded uppercase tracking-wider">
+              Registration Alternative
+            </span>
+            <span className="text-slate-700">
+              Workforce Excel sheet upload serves as an official statutory alternative to registering employees individually. All uploaded personnel receive Form B entries, MVT tracking, and portal credentials.
+            </span>
+          </div>
+          <button
+            onClick={() => setShowBulkImportModal(true)}
+            className="text-emerald-800 font-bold hover:underline shrink-0 text-xs cursor-pointer flex items-center gap-1"
+          >
+            <span>Open Excel Uploader</span>
+            <span>&rarr;</span>
+          </button>
         </div>
 
         {/* Tab Switcher */}
@@ -882,96 +1077,230 @@ export const EmployeeManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Bulk Excel Import Modal */}
+      {/* Requirement 4: Bulk Master Excel Import Modal (.xlsx / .xls) */}
       {showBulkImportModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-xl max-w-xl w-full p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
-                <h3 className="text-base font-bold text-slate-900 uppercase tracking-wider">
-                  Bulk Workforce Excel / CSV Import Engine
-                </h3>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-4xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-200">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 uppercase tracking-tight">
+                    NMDC Employee Master Excel Ingestion Engine
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Supports .xlsx, .xls and .csv files • Server-level duplicate checking & linked record preservation
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => {
                   setShowBulkImportModal(false);
-                  setBulkImportResults(null);
+                  setPreviewRows([]);
+                  setImportSummary(null);
+                  setIsImportCommitted(false);
                 }}
-                className="text-slate-400 hover:text-slate-600 font-bold"
+                className="text-slate-400 hover:text-slate-600 font-bold p-1 rounded-lg"
               >
                 ✕
               </button>
             </div>
 
-            <p className="text-xs text-slate-600 mt-3">
-              Automated validation against duplicates, invalid statutory references, missing mandatory columns, and medical date boundaries.
-            </p>
+            {/* Template & Options Banner */}
+            <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="space-y-1">
+                <div className="font-bold text-slate-900">Standard Donimalai Template Available</div>
+                <div className="text-slate-600">
+                  Use Employee ID as matching key. Updates preserve linked MVT, medical & competency records.
+                </div>
+              </div>
+              <button
+                onClick={handleDownloadExcelTemplate}
+                className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-lg font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0"
+              >
+                <Download className="w-4 h-4 text-emerald-600" />
+                <span>Download .xlsx Template</span>
+              </button>
+            </div>
 
-            <div className="mt-4 p-5 border-2 border-dashed border-slate-300 rounded-xl text-center bg-slate-50 hover:border-amber-400 transition-colors">
-              <Upload className="w-8 h-8 text-amber-600 mx-auto mb-2" />
-              <div className="text-xs font-bold text-slate-900">Upload NMDC Form B / Contractor Manpower CSV File</div>
-              <p className="text-[11px] text-slate-500 mt-1">Select a UTF-8 encoded .csv roster file</p>
-              
-              <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
-                <label className="px-4 py-2 text-xs font-bold bg-amber-500 text-slate-950 rounded-lg hover:bg-amber-400 transition-colors shadow-xs cursor-pointer inline-flex items-center gap-1.5">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Choose CSV File</span>
+            {/* Upload Drop Zone */}
+            <div className="mt-4 p-6 border-2 border-dashed border-slate-300 rounded-2xl text-center bg-slate-50/50 hover:border-amber-400 hover:bg-amber-50/20 transition-all">
+              <Upload className="w-9 h-9 text-amber-600 mx-auto mb-2" />
+              <div className="text-sm font-bold text-slate-900">
+                {importFileName ? `Selected: ${importFileName}` : 'Select Employee Master Spreadsheet'}
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Supports Microsoft Excel (.xlsx, .xls) and CSV (Up to 10MB)
+              </p>
+
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <label className="px-5 py-2.5 text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl transition-all shadow-xs cursor-pointer inline-flex items-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  <span>Choose Spreadsheet File</span>
                   <input
                     type="file"
-                    accept=".csv,.txt"
+                    accept=".xlsx,.xls,.csv"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                          const text = event.target?.result as string;
-                          if (text) handleProcessCSV(text);
-                        };
-                        reader.readAsText(file);
-                      }
+                      if (file) handleProcessExcelFile(file);
                     }}
                   />
                 </label>
-
-                <button
-                  onClick={handleDownloadSampleCSV}
-                  className="px-3 py-2 text-xs font-semibold bg-white text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Sample Template</span>
-                </button>
               </div>
             </div>
 
-            {bulkImportResults && (
-              <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">
-                <div className="flex items-center justify-between font-bold">
-                  <span className="text-slate-900">Total Validated: {bulkImportResults.total}</span>
-                  <span className="text-emerald-700">{bulkImportResults.success} Records Validated</span>
-                  <span className="text-rose-700">{bulkImportResults.errors.length} Flagged</span>
+            {/* Mode Toggle */}
+            <div className="mt-4 flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+                <input
+                  type="checkbox"
+                  checked={isUpdateMode}
+                  onChange={(e) => setIsUpdateMode(e.target.checked)}
+                  className="rounded text-amber-600 focus:ring-amber-500 w-4 h-4"
+                />
+                <span>Controlled Update Mode: Match by Employee ID and update existing records (Preserves linked training and medical history)</span>
+              </label>
+            </div>
+
+            {/* Pre-Commit Preview Table */}
+            {previewRows.length > 0 && !isImportCommitted && (
+              <div className="mt-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-extrabold text-slate-900 uppercase">Pre-Commit Validation Preview:</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-800">
+                      {previewRows.length} Rows Parsed
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs font-mono">
+                    <span className="text-emerald-700 font-bold">
+                      {previewRows.filter((r) => r.status === 'INSERT').length} Inserts
+                    </span>
+                    <span className="text-indigo-700 font-bold">
+                      {previewRows.filter((r) => r.status === 'UPDATE').length} Updates
+                    </span>
+                    <span className="text-rose-700 font-bold">
+                      {previewRows.filter((r) => r.status === 'INVALID').length} Errors
+                    </span>
+                  </div>
                 </div>
-                <div className="border-t border-slate-200 pt-2 text-[11px] text-slate-700 space-y-1">
-                  <span className="font-semibold text-rose-700">Validation Error Exceptions:</span>
-                  {bulkImportResults.errors.map((err, idx) => (
-                    <div key={idx} className="text-rose-800 bg-rose-50 p-1.5 rounded border border-rose-200">
-                      Row {err.row}: {err.error}
-                    </div>
-                  ))}
+
+                <div className="max-h-56 overflow-y-auto border border-slate-200 rounded-xl">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-100 text-slate-600 font-bold sticky top-0">
+                      <tr>
+                        <th className="py-2 px-3">Row</th>
+                        <th className="py-2 px-3">Employee ID</th>
+                        <th className="py-2 px-3">Name</th>
+                        <th className="py-2 px-3">Department</th>
+                        <th className="py-2 px-3">Type</th>
+                        <th className="py-2 px-3">Target Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {previewRows.map((r) => (
+                        <tr key={r.rowNumber} className={r.status === 'INVALID' ? 'bg-rose-50/60' : 'hover:bg-slate-50'}>
+                          <td className="py-2 px-3 font-mono text-slate-500">{r.rowNumber}</td>
+                          <td className="py-2 px-3 font-mono font-bold text-amber-800">{r.employeeId || '(Auto ID)'}</td>
+                          <td className="py-2 px-3 font-semibold text-slate-900">{r.name || '<Empty>'}</td>
+                          <td className="py-2 px-3 text-slate-700">{r.department}</td>
+                          <td className="py-2 px-3 text-slate-600">{r.employeeType}</td>
+                          <td className="py-2 px-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              r.status === 'INSERT'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : r.status === 'UPDATE'
+                                ? 'bg-indigo-100 text-indigo-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {r.action}
+                            </span>
+                            {r.errors.length > 0 && (
+                              <div className="text-[10px] text-rose-600 mt-0.5">{r.errors.join('; ')}</div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  {previewRows.some((r) => r.status === 'INVALID') && (
+                    <button
+                      onClick={handleDownloadErrorReport}
+                      className="px-3 py-1.5 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download Row Error Report</span>
+                    </button>
+                  )}
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      onClick={handleCommitImport}
+                      className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Commit Import to Database ({previewRows.filter((r) => r.status !== 'INVALID').length} Records)</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
-            <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end">
+            {/* Post-Commit Summary Display */}
+            {isImportCommitted && importSummary && (
+              <div className="mt-5 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-3">
+                <div className="flex items-center gap-2 text-emerald-900 font-bold text-sm">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  <span>Import Completed Successfully</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-center font-mono">
+                  <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+                    <div className="text-[10px] text-slate-500">INSERTED</div>
+                    <div className="text-lg font-bold text-emerald-700">{importSummary.inserted}</div>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+                    <div className="text-[10px] text-slate-500">UPDATED</div>
+                    <div className="text-lg font-bold text-indigo-700">{importSummary.updated}</div>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+                    <div className="text-[10px] text-slate-500">SKIPPED</div>
+                    <div className="text-lg font-bold text-slate-700">{importSummary.skipped}</div>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-emerald-200">
+                    <div className="text-[10px] text-slate-500">REJECTED</div>
+                    <div className="text-lg font-bold text-rose-700">{importSummary.rejected}</div>
+                  </div>
+                </div>
+                {importSummary.errors.length > 0 && (
+                  <div className="pt-2 flex justify-between items-center text-rose-800">
+                    <span>{importSummary.errors.length} rows encountered validation errors and were rejected.</span>
+                    <button
+                      onClick={handleDownloadErrorReport}
+                      className="px-3 py-1 bg-white border border-rose-300 rounded font-bold text-rose-700 hover:bg-rose-50"
+                    >
+                      Download Error Log
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mt-6 pt-3 border-t border-slate-100 flex justify-end">
               <button
                 onClick={() => {
                   setShowBulkImportModal(false);
-                  setBulkImportResults(null);
+                  setPreviewRows([]);
+                  setImportSummary(null);
+                  setIsImportCommitted(false);
                 }}
-                className="px-4 py-1.5 text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg"
+                className="px-5 py-2 text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl"
               >
-                Close
+                Close Window
               </button>
             </div>
           </div>

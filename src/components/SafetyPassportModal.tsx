@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import { NMDCLogo } from './NMDCLogo';
 import {
   ShieldCheck,
   Award,
@@ -57,8 +58,8 @@ export const SafetyPassportModal: React.FC = () => {
         {/* Top Header */}
         <div className="bg-slate-50 p-5 border-b border-slate-200 flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950 font-black text-lg shadow-sm border border-amber-400">
-              NMDC
+            <div className="h-12 w-12 bg-white rounded-xl shadow-xs shrink-0 flex items-center justify-center p-0.5 border border-slate-200">
+              <NMDCLogo className="h-full w-auto" showText={true} />
             </div>
             <div>
               <div className="text-[10px] font-bold tracking-widest uppercase text-amber-800">

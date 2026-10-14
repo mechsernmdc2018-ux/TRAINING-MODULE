@@ -4,6 +4,12 @@ import {
   Award,
   Download,
   Printer,
+  Stethoscope,
+  GraduationCap,
+  FileSpreadsheet,
+  CheckCircle2,
+  Clock,
+  ShieldAlert,
 } from 'lucide-react';
 
 export const ReportsMIS: React.FC = () => {
@@ -13,10 +19,14 @@ export const ReportsMIS: React.FC = () => {
     mvtStatuses,
     contractors,
     certificates,
+    medicalRecords,
+    otherTrainingRecords,
     exportToCSV,
   } = useApp();
 
-  const [reportType, setReportType] = useState<'MVT_SUMMARY' | 'CONTRACTOR_SCORECARD' | 'DEPARTMENT_COMPLIANCE' | 'CERTIFICATE_REGISTER'>('MVT_SUMMARY');
+  const [reportType, setReportType] = useState<
+    'MVT_SUMMARY' | 'MEDICAL_REGISTER' | 'OTHER_TRAINING' | 'CONTRACTOR_SCORECARD' | 'CERTIFICATE_REGISTER'
+  >('MVT_SUMMARY');
 
   const handleExportCurrentReport = () => {
     if (reportType === 'MVT_SUMMARY') {
@@ -36,6 +46,39 @@ export const ReportsMIS: React.FC = () => {
         ];
       });
       exportToCSV('NMDC_Donimalai_MVT_Compliance_Register', headers, rows);
+    } else if (reportType === 'MEDICAL_REGISTER') {
+      const headers = ['Record ID', 'Worker ID', 'Worker Name', 'Department', 'Exam Type', 'Statutory Rule', 'Exam Date', 'Status', 'Fitness Result', 'Valid Till', 'Next Due Date'];
+      const rows = medicalRecords.map((m) => [
+        m.id,
+        m.workerId,
+        m.workerName,
+        m.workerDepartment,
+        m.examType,
+        m.statutoryRuleReference,
+        m.completedDate || m.scheduledDate,
+        m.examStatus,
+        m.fitnessResult || 'N/A',
+        m.validTill || 'N/A',
+        m.nextDueDate || 'N/A',
+      ]);
+      exportToCSV('NMDC_Donimalai_Medical_Examination_Register', headers, rows);
+    } else if (reportType === 'OTHER_TRAINING') {
+      const headers = ['Record ID', 'Worker ID', 'Worker Name', 'Category', 'Course Title', 'Provider', 'Venue', 'Dates', 'Duration Hours', 'Cost (INR)', 'Completion Status', 'Certificate Number'];
+      const rows = otherTrainingRecords.map((t) => [
+        t.id,
+        t.workerId,
+        t.workerName,
+        t.trainingCategory,
+        t.courseTitle,
+        t.trainingProvider,
+        t.venue,
+        `${t.startDate} to ${t.endDate}`,
+        t.durationHours,
+        t.costInr,
+        t.completionStatus,
+        t.certificateNumber,
+      ]);
+      exportToCSV('NMDC_Donimalai_Other_Training_Register', headers, rows);
     } else if (reportType === 'CONTRACTOR_SCORECARD') {
       const headers = ['Contractor Code', 'Name', 'Work Order', 'Total Manpower', 'MVT Valid', 'MVT Overdue', 'Compliance %'];
       const rows = contractors.map((c) => {
@@ -68,7 +111,7 @@ export const ReportsMIS: React.FC = () => {
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Executive compliance analytics • Statutory DGMS Form B registers • Automated CSV / Excel generation
+              Executive compliance analytics • Statutory DGMS Form B & Rule 29B registers • Automated CSV / Excel generation
             </p>
           </div>
 
@@ -90,60 +133,79 @@ export const ReportsMIS: React.FC = () => {
           </div>
         </div>
 
-        {/* Report Selector */}
-        <div className="flex items-center gap-2 mt-4 text-xs overflow-x-auto">
+        {/* Report Selector Tabs */}
+        <div className="flex items-center gap-2 mt-4 text-xs overflow-x-auto scrollbar-none">
           <button
             onClick={() => setReportType('MVT_SUMMARY')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               reportType === 'MVT_SUMMARY' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-600 hover:text-slate-900 bg-slate-100'
             }`}
           >
-            MVT Compliance Summary (Form B)
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>MVT Compliance Summary (Form B)</span>
+          </button>
+          <button
+            onClick={() => setReportType('MEDICAL_REGISTER')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              reportType === 'MEDICAL_REGISTER' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-600 hover:text-slate-900 bg-slate-100'
+            }`}
+          >
+            <Stethoscope className="w-3.5 h-3.5" />
+            <span>Medical Examination Register (Rule 29B)</span>
+          </button>
+          <button
+            onClick={() => setReportType('OTHER_TRAINING')}
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              reportType === 'OTHER_TRAINING' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-600 hover:text-slate-900 bg-slate-100'
+            }`}
+          >
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>Other Training Register (OEM/Ext/Int)</span>
           </button>
           <button
             onClick={() => setReportType('CONTRACTOR_SCORECARD')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               reportType === 'CONTRACTOR_SCORECARD' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-600 hover:text-slate-900 bg-slate-100'
             }`}
           >
-            Contractor Scorecard
+            <span>Contractor Scorecard</span>
           </button>
           <button
             onClick={() => setReportType('CERTIFICATE_REGISTER')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               reportType === 'CERTIFICATE_REGISTER' ? 'bg-amber-500 text-slate-950 font-bold' : 'text-slate-600 hover:text-slate-900 bg-slate-100'
             }`}
           >
-            Certificates Registry
+            <span>Certificates Registry</span>
           </button>
         </div>
       </div>
 
       {/* KPI Summary Banner */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-xs">
           <div className="text-[10px] font-semibold text-slate-500 uppercase">MVT Compliance</div>
           <div className="text-xl font-bold font-mono text-emerald-700 mt-1">{kpis.mvtCompliancePercent}%</div>
         </div>
         <div className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-xs">
-          <div className="text-[10px] font-semibold text-slate-500 uppercase">Training Hours</div>
-          <div className="text-xl font-bold font-mono text-amber-800 mt-1">{kpis.totalTrainingHoursCompleted}h</div>
+          <div className="text-[10px] font-semibold text-slate-500 uppercase">Medical Fit Workers</div>
+          <div className="text-xl font-bold font-mono text-emerald-700 mt-1">{kpis.medicalFitCount}</div>
+        </div>
+        <div className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-xs">
+          <div className="text-[10px] font-semibold text-slate-500 uppercase">Other Training Outlay</div>
+          <div className="text-xl font-bold font-mono text-indigo-700 mt-1">₹{(kpis.otherTrainingTotalCost / 100000).toFixed(1)}L</div>
         </div>
         <div className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-xs">
           <div className="text-[10px] font-semibold text-slate-500 uppercase">Certificates Issued</div>
           <div className="text-xl font-bold font-mono text-slate-900 mt-1">{certificates.length}</div>
         </div>
         <div className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-xs">
-          <div className="text-[10px] font-semibold text-slate-500 uppercase">High Risk Cleared</div>
-          <div className="text-xl font-bold font-mono text-orange-700 mt-1">{kpis.highRiskCompliancePercent}%</div>
-        </div>
-        <div className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-xs">
           <div className="text-[10px] font-semibold text-slate-500 uppercase">MVT Overdue</div>
           <div className="text-xl font-bold font-mono text-rose-700 mt-1">{kpis.mvtOverdue} Cases</div>
         </div>
         <div className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-xs">
-          <div className="text-[10px] font-semibold text-slate-500 uppercase">Induction Pending</div>
-          <div className="text-xl font-bold font-mono text-sky-700 mt-1">{kpis.newJoinersAwaitingInduction} Workers</div>
+          <div className="text-[10px] font-semibold text-slate-500 uppercase">Medical Overdue</div>
+          <div className="text-xl font-bold font-mono text-rose-700 mt-1">{kpis.medicalOverdueCount} Cases</div>
         </div>
       </div>
 
@@ -153,7 +215,7 @@ export const ReportsMIS: React.FC = () => {
           <h3 className="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">
             {reportType.replace('_', ' ')} DATA REGISTER
           </h3>
-          <span className="text-xs text-slate-500 font-mono">Live query</span>
+          <span className="text-xs text-slate-500 font-mono">Live Donimalai query</span>
         </div>
 
         <div className="overflow-x-auto mt-4">
@@ -189,6 +251,82 @@ export const ReportsMIS: React.FC = () => {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          )}
+
+          {reportType === 'MEDICAL_REGISTER' && (
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500 font-semibold bg-slate-50">
+                  <th className="py-2.5 px-3">Record ID</th>
+                  <th className="py-2.5 px-3">Worker ID</th>
+                  <th className="py-2.5 px-3">Worker Name</th>
+                  <th className="py-2.5 px-3">Department</th>
+                  <th className="py-2.5 px-3">Exam Type</th>
+                  <th className="py-2.5 px-3">Date</th>
+                  <th className="py-2.5 px-3">Fitness Result</th>
+                  <th className="py-2.5 px-3">Next Due</th>
+                  <th className="py-2.5 px-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {medicalRecords.map((m) => (
+                  <tr key={m.id} className="hover:bg-slate-50">
+                    <td className="py-2 px-3 font-mono text-amber-800 font-bold">{m.id}</td>
+                    <td className="py-2 px-3 font-mono text-slate-700">{m.workerId}</td>
+                    <td className="py-2 px-3 font-semibold text-slate-900">{m.workerName}</td>
+                    <td className="py-2 px-3 text-slate-700">{m.workerDepartment}</td>
+                    <td className="py-2 px-3 font-semibold text-slate-800">{m.examType}</td>
+                    <td className="py-2 px-3 font-mono text-slate-600">{m.completedDate || m.scheduledDate}</td>
+                    <td className="py-2 px-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        m.fitnessResult === 'FIT' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
+                        {m.fitnessResult || 'PENDING'}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 font-mono text-slate-600">{m.nextDueDate || 'N/A'}</td>
+                    <td className="py-2 px-3 text-center font-bold text-[10px] text-slate-700">{m.examStatus}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {reportType === 'OTHER_TRAINING' && (
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500 font-semibold bg-slate-50">
+                  <th className="py-2.5 px-3">Course Title</th>
+                  <th className="py-2.5 px-3">Worker Name</th>
+                  <th className="py-2.5 px-3">Category</th>
+                  <th className="py-2.5 px-3">Provider</th>
+                  <th className="py-2.5 px-3">Duration</th>
+                  <th className="py-2.5 px-3">Cost (INR)</th>
+                  <th className="py-2.5 px-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {otherTrainingRecords.map((t) => (
+                  <tr key={t.id} className="hover:bg-slate-50">
+                    <td className="py-2 px-3 font-bold text-slate-900">{t.courseTitle}</td>
+                    <td className="py-2 px-3 font-medium text-slate-800">{t.workerName} ({t.workerId})</td>
+                    <td className="py-2 px-3">
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-[10px] font-bold border border-indigo-200">
+                        {t.trainingCategory}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 text-slate-600">{t.trainingProvider}</td>
+                    <td className="py-2 px-3 font-mono text-slate-600">{t.durationHours} hrs</td>
+                    <td className="py-2 px-3 font-mono text-slate-700">₹{t.costInr.toLocaleString('en-IN')}</td>
+                    <td className="py-2 px-3 text-center">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {t.completionStatus}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}

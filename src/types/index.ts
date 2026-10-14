@@ -2,6 +2,8 @@ export type UserRole =
   | 'Super Administrator'
   | 'Training Officer'
   | 'Safety Officer'
+  | 'Medical Officer'
+  | 'Authorized Medical Personnel'
   | 'Mine Manager'
   | 'Department Head'
   | 'Supervisor'
@@ -402,3 +404,249 @@ export interface SystemSettings {
   ssoEnabled: boolean;
   biometricIntegrationReady: boolean;
 }
+
+// ----------------------------------------------------
+// Medical Examination Module (Mines Rules 1955 Rule 29B)
+// ----------------------------------------------------
+
+export type MedicalExamType = 'IME' | 'PME';
+export type MedicalFitnessResult = 'FIT' | 'UNFIT' | 'TEMPORARILY_UNFIT' | 'FIT_WITH_RESTRICTION';
+export type MedicalExamStatus = 'COMPLETED' | 'SCHEDULED' | 'OVERDUE' | 'DUE_SOON' | 'APPEAL_PENDING';
+export type PersonnelCategory = 'REGULAR_EXECUTIVE' | 'REGULAR_WORKMAN' | 'CONTRACTOR_WORKMAN';
+
+export interface MedicalRecord {
+  id: string;
+  workerId: string;
+  workerName: string;
+  workerDesignation: string;
+  workerDepartment: string;
+  workerCategory: PersonnelCategory;
+  workerAge: number;
+  dateOfBirth: string;
+  examType: MedicalExamType; // Initial or Periodical
+  examStatus: MedicalExamStatus;
+  scheduledDate: string;
+  completedDate: string | null;
+  validTill: string;
+  nextDueDate: string;
+  certificateNumber: string; // e.g. FORM-O/NMDC/2026/089
+  examiningDoctor: string;
+  doctorRegistrationNo: string;
+  fitnessResult: MedicalFitnessResult;
+
+  // DGMS Statutory Notice Reference (Form M & N)
+  formMNoticeNumber?: string | null;
+  formMNoticeDate?: string | null;
+  formNNoticeNumber?: string | null;
+  formNNoticeDate?: string | null;
+  statutoryRuleReference: string; // 'Mines Rules 1955 - Rule 29B'
+  ruleVersion: string; // e.g. 'DGMS Gazette Notification 2021'
+
+  // Non-sensitive summary (visible to All authorized users)
+  publicFitnessIndicator: string; // 'Fit for Opencast Heavy Mining Duties'
+  restrictionNotes?: string; // e.g. 'Must wear corrective spectacles during HEMM operation'
+
+  // Sensitive Clinical Examination Data (STRICTLY restricted to Medical Officer & System Admin)
+  chestXRayResult?: 'NORMAL' | 'PNEUMOCONIOSIS_CATEGORY_1' | 'SUSPICIOUS' | 'CLEAR';
+  chestXRayDate?: string;
+  audiometryResult?: 'NORMAL_HEARING' | 'MILD_HIGH_FREQ_LOSS' | 'NOISE_INDUCED_HEARING_LOSS';
+  lungSpirometryFvc?: string; // e.g. '3.9 L (98% of predicted)'
+  bloodPressure?: string; // e.g. '120/80 mmHg'
+  bloodSugarFasting?: string; // e.g. '92 mg/dL'
+  visualAcuity?: string; // e.g. '6/6 (with glasses)'
+  clinicalObservations?: string; // Doctor's private medical notes
+  sensitiveDiagnosisNotes?: string;
+  confidentialPrescriptions?: string;
+}
+
+export interface StatutoryRuleVersion {
+  id: string;
+  ruleCode: string; // e.g. 'RULE-29B-PME'
+  ruleTitle: string;
+  governingAct: string; // e.g. 'Mines Act 1952 / Mines Rules 1955'
+  gazetteReference: string; // e.g. 'GSR 1886 dt. 20-12-1965 / DGMS Cir 01 of 2021'
+  officialCircularNumber: string;
+  version: string;
+  effectiveDate: string;
+  periodicityMonthsUnder45: number; // 60 months (5 years)
+  periodicityMonthsOver45: number; // 36 months (3 years)
+  highRiskPeriodicityMonths?: number; // 12-24 months
+  prescribedForms: string[]; // ['Form M', 'Form N', 'Form O']
+  status: 'ACTIVE' | 'SUPERSEDED' | 'PROPOSED';
+  summary: string;
+  notes?: string;
+}
+
+export interface MedicalNotice {
+  id: string;
+  workerId: string;
+  workerName: string;
+  noticeType: 'FORM_M_INITIAL' | 'FORM_M_PERIODICAL' | 'FORM_N_REEXAMINATION' | 'COMPLIANCE_REMINDER';
+  noticeNumber: string;
+  issueDate: string;
+  examScheduledDate: string;
+  venue: string;
+  servedBy: string;
+  status: 'ISSUED' | 'ACKNOWLEDGED' | 'COMPLIED' | 'OVERDUE';
+  remarks?: string;
+}
+
+// ----------------------------------------------------
+// Other Training Records (OEM, Internal, External, International)
+// ----------------------------------------------------
+
+export type OtherTrainingCategory = 'OEM' | 'INTERNAL' | 'EXTERNAL' | 'INTERNATIONAL';
+export type TrainingApprovalStatus = 'APPROVED' | 'PENDING_HOD_APPROVAL' | 'REJECTED';
+export type TrainingCompletionStatus = 'COMPLETED' | 'ONGOING' | 'NOMINATED' | 'DROPPED';
+
+export interface OtherTrainingRecord {
+  id: string;
+  workerId: string;
+  workerName: string;
+  workerDepartment: string;
+  workerDesignation: string;
+  workerCategory: PersonnelCategory;
+  trainingCategory: OtherTrainingCategory;
+  courseTitle: string;
+  trainingProvider: string; // e.g. 'BEML Training Institute', 'Tata Hitachi', 'IIT Kharagpur'
+  venue: string;
+  startDate: string;
+  endDate: string;
+  durationHours: number;
+  durationDays: number;
+  costInr: number;
+  financialYear: string; // e.g. '2026-27'
+  attendanceStatus: 'PRESENT' | 'PARTIAL' | 'ABSENT';
+  completionStatus: TrainingCompletionStatus;
+  approvalStatus: TrainingApprovalStatus;
+  approvingAuthority: string;
+  certificateNumber: string;
+  certificateUrl?: string;
+  skillsLearned: string[];
+  remarks?: string;
+  createdAt: string;
+}
+
+// ----------------------------------------------------
+// Employee Master Excel Import Types
+// ----------------------------------------------------
+
+export interface ExcelImportRow {
+  rowNumber: number;
+  status: 'INSERT' | 'UPDATE' | 'INVALID' | 'SKIPPED';
+  action: string;
+  employeeId: string;
+  name: string;
+  employeeType: EmploymentType;
+  workerCategory: PersonnelCategory;
+  department: string;
+  section: string;
+  designation: string;
+  trade: string;
+  grade: string;
+  dateOfBirth: string;
+  mobile: string;
+  email: string;
+  shift: Employee['shift'];
+  workLocation: string;
+  contractorName?: string;
+  workOrderNumber?: string;
+  medicalFitnessValidTill: string;
+  errors: string[];
+  existingRecord?: Employee;
+}
+
+export interface ExcelImportSummary {
+  fileName: string;
+  totalRows: number;
+  insertedCount: number;
+  updatedCount: number;
+  skippedCount: number;
+  rejectedCount: number;
+  processedAt: string;
+  committed: boolean;
+}
+
+// ----------------------------------------------------
+// Operational Records Bulk Excel Import Types (Medical, Other Training, Statutory MVT)
+// ----------------------------------------------------
+
+export interface MedicalRecordImportRow {
+  rowNumber: number;
+  status: 'INSERT' | 'UPDATE' | 'INVALID';
+  workerId: string;
+  workerName: string;
+  department: string;
+  examType: MedicalExamType;
+  examDate: string;
+  fitnessResult: MedicalFitnessResult;
+  validTill: string;
+  nextDueDate: string;
+  certificateNumber: string;
+  examiningDoctor: string;
+  doctorRegistrationNo: string;
+  statutoryRuleReference: string;
+  publicFitnessIndicator: string;
+  restrictionNotes?: string;
+  errors: string[];
+}
+
+export interface OtherTrainingImportRow {
+  rowNumber: number;
+  status: 'INSERT' | 'UPDATE' | 'INVALID';
+  workerId: string;
+  workerName: string;
+  department: string;
+  trainingCategory: OtherTrainingCategory;
+  courseTitle: string;
+  trainingProvider: string;
+  venue: string;
+  startDate: string;
+  endDate: string;
+  durationHours: number;
+  costInr: number;
+  financialYear: string;
+  completionStatus: TrainingCompletionStatus;
+  certificateNumber: string;
+  skillsLearned: string;
+  errors: string[];
+}
+
+export interface MVTRecordImportRow {
+  rowNumber: number;
+  status: 'INSERT' | 'UPDATE' | 'INVALID';
+  workerId: string;
+  workerName: string;
+  department: string;
+  trainingType: 'Initial' | 'Refresher' | 'Special' | 'Induction';
+  trainingName: string;
+  completionDate: string;
+  validTill: string;
+  trainerName: string;
+  attendanceScore: string;
+  assessmentResult: 'PASS' | 'FAIL' | 'EXEMPT';
+  certificateNumber: string;
+  statutoryRuleApplied: string;
+  errors: string[];
+}
+
+export type RecordUploadType =
+  | 'EMPLOYEE_MASTER'
+  | 'STATUTORY_MVT'
+  | 'MEDICAL_RECORDS'
+  | 'OTHER_TRAINING';
+
+export interface RegisteredUser {
+  id: string;
+  name: string;
+  email: string;
+  password?: string;
+  role: UserRole;
+  designation: string;
+  department: string;
+  employeeId?: string;
+  phone?: string;
+  avatar?: string;
+  createdAt: string;
+}
+

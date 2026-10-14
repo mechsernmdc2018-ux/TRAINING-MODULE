@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { WorkerClassification, EmploymentType } from '../types';
 import { getPersonnelAvatar } from '../utils/avatarUtils';
+import { NMDCLogo } from './NMDCLogo';
 import {
   UserPlus,
   X,
@@ -19,6 +20,9 @@ import {
   Truck,
   Eye,
   RefreshCw,
+  FileSpreadsheet,
+  UploadCloud,
+  ArrowRight,
 } from 'lucide-react';
 
 export const EmployeeRegistrationModal: React.FC = () => {
@@ -31,6 +35,7 @@ export const EmployeeRegistrationModal: React.FC = () => {
     addEmployee,
     addContractWorker,
     setViewPassportWorkerId,
+    setActiveTab,
   } = useApp();
 
   // Mode: Regular vs Contract
@@ -239,11 +244,11 @@ export const EmployeeRegistrationModal: React.FC = () => {
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="bg-white border border-slate-200 rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden my-6 animate-in zoom-in-95 flex flex-col max-h-[92vh]">
-        {/* Modal Header */}
+        {/* Modal Header with Official NMDC Emblem */}
         <div className="bg-slate-50 p-4 sm:p-5 border-b border-slate-200 flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center text-slate-950 font-black text-lg shadow-2xs border border-amber-400 shrink-0">
-              NMDC
+            <div className="h-12 w-12 bg-white rounded-xl shadow-xs shrink-0 flex items-center justify-center p-0.5 border border-slate-200">
+              <NMDCLogo className="h-full w-auto" showText={true} />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -330,6 +335,38 @@ export const EmployeeRegistrationModal: React.FC = () => {
           ) : (
             /* Registration Form */
             <form onSubmit={handleSubmit} className="space-y-5 text-xs">
+              {/* Statutory Alternative to Individual Registration: Bulk Excel Sheet Upload */}
+              <div className="p-3.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 rounded-xl border border-emerald-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-start gap-2.5">
+                  <div className="p-2 bg-emerald-600 text-white rounded-lg shrink-0 mt-0.5 shadow-xs">
+                    <FileSpreadsheet className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded">
+                        Alternative Registration Method
+                      </span>
+                      <span className="text-[11px] font-bold text-slate-900">Bulk Workforce Excel Upload</span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Need to register multiple employees? Upload the official NMDC Employee Master Excel sheet to instantly register, enroll in Form B, and provision login accounts for all workforce personnel at once.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegisterEmployeeOpen(false);
+                    setActiveTab('excel-upload');
+                  }}
+                  className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-extrabold text-xs flex items-center justify-center gap-1.5 shrink-0 shadow-xs transition-colors cursor-pointer"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>Upload Excel Sheet Instead</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
               {/* Cadre Type Selector */}
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <span className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">

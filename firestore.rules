@@ -159,5 +159,51 @@ service cloud.firestore {
         && incoming().id == existing().id;
       allow delete: if isSignedIn() && isValidId(certificateId);
     }
+    // 7. Medical Records Collection
+    match /medicalRecords/{recordId} {
+      function isValidMedicalRecord(data) {
+        return data.keys().hasAll(['id', 'workerId', 'examType', 'fitnessResult', 'statutoryRuleReference'])
+          && data.id is string && data.id.size() <= 128
+          && data.workerId is string && data.workerId.size() <= 80
+          && (data.examType == 'IME' || data.examType == 'PME')
+          && (data.fitnessResult == 'FIT' || data.fitnessResult == 'UNFIT' || data.fitnessResult == 'TEMPORARILY_UNFIT' || data.fitnessResult == 'FIT_WITH_RESTRICTION')
+          && data.statutoryRuleReference is string && data.statutoryRuleReference.size() <= 120;
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(recordId)
+        && isValidMedicalRecord(incoming())
+        && incoming().id == recordId;
+      allow update: if isSignedIn()
+        && isValidId(recordId)
+        && isValidMedicalRecord(incoming())
+        && incoming().id == existing().id;
+      allow delete: if isSignedIn() && isValidId(recordId);
+    }
+
+    // 8. Other Training Records Collection
+    match /otherTrainingRecords/{recordId} {
+      function isValidOtherTrainingRecord(data) {
+        return data.keys().hasAll(['id', 'workerId', 'trainingCategory', 'courseTitle', 'completionStatus'])
+          && data.id is string && data.id.size() <= 128
+          && data.workerId is string && data.workerId.size() <= 80
+          && (data.trainingCategory == 'OEM' || data.trainingCategory == 'INTERNAL' || data.trainingCategory == 'EXTERNAL' || data.trainingCategory == 'INTERNATIONAL')
+          && data.courseTitle is string && data.courseTitle.size() <= 200
+          && (data.completionStatus == 'COMPLETED' || data.completionStatus == 'ONGOING' || data.completionStatus == 'NOMINATED' || data.completionStatus == 'DROPPED');
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidId(recordId)
+        && isValidOtherTrainingRecord(incoming())
+        && incoming().id == recordId;
+      allow update: if isSignedIn()
+        && isValidId(recordId)
+        && isValidOtherTrainingRecord(incoming())
+        && incoming().id == existing().id;
+      allow delete: if isSignedIn() && isValidId(recordId);
+    }
   }
 }
+

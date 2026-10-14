@@ -41,6 +41,16 @@ import {
   DeploymentClearance,
   ComplianceStatus,
   EmploymentType,
+  MedicalRecord,
+  StatutoryRuleVersion,
+  MedicalNotice,
+  OtherTrainingRecord,
+  ExcelImportRow,
+  ExcelImportSummary,
+  RegisteredUser,
+  MedicalRecordImportRow,
+  OtherTrainingImportRow,
+  MVTRecordImportRow,
 } from '../types';
 import {
   INITIAL_SYSTEM_SETTINGS,
@@ -59,6 +69,10 @@ import {
   INITIAL_AUDIT_FINDINGS,
   INITIAL_DOCUMENTS,
   INITIAL_AUDIT_LOGS,
+  INITIAL_MEDICAL_RECORDS,
+  INITIAL_STATUTORY_RULE_VERSIONS,
+  INITIAL_MEDICAL_NOTICES,
+  INITIAL_OTHER_TRAINING_RECORDS,
 } from '../data/mockData';
 import { getPersonnelAvatar } from '../utils/avatarUtils';
 
@@ -70,6 +84,35 @@ export interface UserProfile {
   department: string;
   avatar: string;
   permissions: Permission[];
+}
+
+export function getRolePermissions(role: UserRole): Permission[] {
+  switch (role) {
+    case 'Super Administrator':
+      return ['View', 'Create', 'Edit', 'Approve', 'Verify', 'Schedule', 'Conduct', 'Assess', 'Issue Certificate', 'Export', 'Configure', 'Administer'];
+    case 'Training Officer':
+      return ['View', 'Create', 'Edit', 'Schedule', 'Conduct', 'Assess', 'Issue Certificate', 'Export', 'Configure'];
+    case 'Safety Officer':
+      return ['View', 'Create', 'Edit', 'Verify', 'Approve', 'Conduct', 'Assess', 'Export', 'Configure'];
+    case 'Mine Manager':
+      return ['View', 'Approve', 'Verify', 'Export', 'Administer'];
+    case 'Department Head':
+      return ['View', 'Approve', 'Export'];
+    case 'Medical Officer':
+    case 'Authorized Medical Personnel':
+      return ['View', 'Create', 'Edit', 'Verify', 'Approve', 'Issue Certificate', 'Export'];
+    case 'Supervisor':
+    case 'Contractor Administrator':
+      return ['View', 'Create', 'Edit', 'Schedule', 'Export'];
+    case 'Trainer':
+      return ['View', 'Conduct', 'Assess', 'Schedule'];
+    case 'Auditor':
+      return ['View', 'Export'];
+    case 'Employee':
+    case 'Management Viewer':
+    default:
+      return ['View'];
+  }
 }
 
 export const OFFICIAL_USERS: UserProfile[] = [
@@ -162,6 +205,28 @@ export const OFFICIAL_USERS: UserProfile[] = [
     ],
   },
   {
+    id: 'OFFICER-MED-01',
+    name: 'Dr. B. K. Sharma',
+    role: 'Medical Officer',
+    designation: 'Chief Medical Officer / Authorized Medical Personnel',
+    department: 'Medical Services',
+    avatar: getPersonnelAvatar('Dr. B. K. Sharma', 'OFFICER'),
+    permissions: [
+      'View', 'Create', 'Edit', 'Verify', 'Approve', 'Conduct', 'Assess', 'Issue Certificate', 'Export'
+    ],
+  },
+  {
+    id: 'NMDC-EMP-002',
+    name: 'Basavaraj Mudgal',
+    role: 'Employee',
+    designation: 'Senior HEMM Operator (W-07)',
+    department: 'Mining',
+    avatar: getPersonnelAvatar('Basavaraj Mudgal', 'REGULAR'),
+    permissions: [
+      'View'
+    ],
+  },
+  {
     id: 'OFFICER-AUD-01',
     name: 'Statutory Auditor',
     role: 'Auditor',
@@ -177,9 +242,15 @@ export const OFFICIAL_USERS: UserProfile[] = [
 // Alias for backwards compatibility
 export const DEMO_USERS = OFFICIAL_USERS;
 
+export type MiningLease = 'DIOM ML 2396' | 'KIOM ML 1111';
+export type PortalAuthScreen = 'LOGIN' | 'LEASE_SELECTION' | 'PORTAL';
+
 export type ActiveTab =
   | 'dashboard'
   | 'mvt-command'
+  | 'medical'
+  | 'other-training'
+  | 'excel-upload'
   | 'statutory-engine'
   | 'workforce'
   | 'training'
@@ -202,6 +273,25 @@ interface AppContextType {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
 
+  // Mining Lease & Authentication Flow
+  selectedLease: MiningLease;
+  setSelectedLease: (lease: MiningLease) => void;
+  authScreen: PortalAuthScreen;
+  setAuthScreen: (screen: PortalAuthScreen) => void;
+  selectLeaseAndEnterPortal: (lease: MiningLease) => void;
+  isAuthenticated: boolean;
+  setIsAuthenticated: (auth: boolean) => void;
+  loginAsRole: (userId: string) => void;
+
+  // User Accounts & Registration
+  registeredUsers: RegisteredUser[];
+  allUsers: UserProfile[];
+  registerUser: (userData: Omit<RegisteredUser, 'id' | 'createdAt'>) => Promise<{ success: boolean; user?: RegisteredUser; error?: string }>;
+  loginUser: (emailOrId: string, password?: string) => Promise<{ success: boolean; user?: UserProfile; error?: string }>;
+  logoutUser: () => void;
+  isLoginModalOpen: boolean;
+  setIsLoginModalOpen: (open: boolean) => void;
+
   // Data
   employees: Employee[];
   contractors: Contractor[];
@@ -219,6 +309,10 @@ interface AppContextType {
   documents: DocumentItem[];
   auditLogs: AuditLog[];
   systemSettings: SystemSettings;
+  medicalRecords: MedicalRecord[];
+  statutoryRuleVersions: StatutoryRuleVersion[];
+  medicalNotices: MedicalNotice[];
+  otherTrainingRecords: OtherTrainingRecord[];
 
   // Selected for modals/inspection
   inspectedWorker: Employee | null;
@@ -251,6 +345,18 @@ interface AppContextType {
     highRiskCompliancePercent: number;
     totalTrainingHoursCompleted: number;
     totalCertificatesIssued: number;
+
+    // Medical Examination KPIs
+    medicalFitCount: number;
+    medicalUnfitCount: number;
+    medicalDueSoonCount: number;
+    medicalOverdueCount: number;
+    medicalCompliancePercent: number;
+
+    // Other Training KPIs
+    otherTrainingTotalCount: number;
+    otherTrainingCompletedCount: number;
+    otherTrainingTotalCost: number;
   };
 
   // Actions
@@ -273,6 +379,26 @@ interface AppContextType {
   addAuditFinding: (finding: Omit<AuditFinding, 'id' | 'actionAssignedDate'>) => void;
   updateAuditFindingStatus: (id: string, status: AuditFinding['status'], evidence?: string) => void;
   updateSystemSettings: (settings: SystemSettings) => void;
+
+  // Medical Examination Module Actions
+  addMedicalRecord: (rec: Omit<MedicalRecord, 'id'>) => MedicalRecord;
+  updateMedicalRecord: (rec: MedicalRecord) => void;
+  addMedicalNotice: (notice: Omit<MedicalNotice, 'id'>) => MedicalNotice;
+
+  // Other Training Records Module Actions
+  addOtherTrainingRecord: (rec: Omit<OtherTrainingRecord, 'id' | 'createdAt'>) => OtherTrainingRecord;
+  updateOtherTrainingRecord: (rec: OtherTrainingRecord) => void;
+
+  // Statutory Rule Version Actions
+  addStatutoryRuleVersion: (rule: Omit<StatutoryRuleVersion, 'id'>) => StatutoryRuleVersion;
+  updateStatutoryRuleVersion: (rule: StatutoryRuleVersion) => void;
+
+  // Bulk Excel Record Import Actions (Apart from Registration)
+  bulkImportEmployees: (rows: ExcelImportRow[], isUpdateMode: boolean) => Promise<{ inserted: number; updated: number; skipped: number; rejected: number; errors: { row: number; error: string }[] }>;
+  bulkImportMedicalRecords: (rows: MedicalRecordImportRow[], isUpdateMode: boolean) => Promise<{ inserted: number; updated: number; skipped: number; rejected: number; errors: { row: number; error: string }[] }>;
+  bulkImportMVTRecords: (rows: MVTRecordImportRow[], isUpdateMode: boolean) => Promise<{ inserted: number; updated: number; skipped: number; rejected: number; errors: { row: number; error: string }[] }>;
+  bulkImportOtherTrainingRecords: (rows: OtherTrainingImportRow[], isUpdateMode: boolean) => Promise<{ inserted: number; updated: number; skipped: number; rejected: number; errors: { row: number; error: string }[] }>;
+
   clearAllRecords: () => void;
   purgeMockData: () => void;
   resetToDemoData: () => void;
@@ -290,7 +416,106 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<UserProfile>(OFFICIAL_USERS[0]);
+  // Registered User Accounts (Requirement 2: User Login & Registration)
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>(() => {
+    try {
+      const saved = localStorage.getItem('NMDC_REGISTERED_USERS');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('NMDC_REGISTERED_USERS', JSON.stringify(registeredUsers));
+  }, [registeredUsers]);
+
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+  const allUsers = useMemo<UserProfile[]>(() => {
+    const regProfiles: UserProfile[] = registeredUsers.map((reg) => ({
+      id: reg.id,
+      name: reg.name,
+      role: reg.role,
+      designation: reg.designation,
+      department: reg.department,
+      avatar: reg.avatar || getPersonnelAvatar(reg.name, 'OFFICER'),
+      permissions: getRolePermissions(reg.role),
+    }));
+    return [...OFFICIAL_USERS, ...regProfiles];
+  }, [registeredUsers]);
+
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
+    try {
+      const saved = localStorage.getItem('NMDC_CURRENT_USER');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.name && parsed?.role) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return OFFICIAL_USERS[0];
+  });
+
+  // Mining Lease & Portal Authentication Flow
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('NMDC_IS_AUTHENTICATED') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [selectedLease, setSelectedLease] = useState<MiningLease>(() => {
+    try {
+      const saved = localStorage.getItem('NMDC_SELECTED_LEASE');
+      if (saved === 'KIOM ML 1111' || saved === 'DIOM ML 2396') {
+        return saved;
+      }
+    } catch {
+      // fallback
+    }
+    return 'DIOM ML 2396';
+  });
+
+  const [authScreen, setAuthScreen] = useState<PortalAuthScreen>(() => {
+    try {
+      const isAuthed = localStorage.getItem('NMDC_IS_AUTHENTICATED') === 'true';
+      if (!isAuthed) return 'LOGIN';
+      const hasLease = localStorage.getItem('NMDC_SELECTED_LEASE');
+      if (hasLease) return 'PORTAL';
+      return 'LEASE_SELECTION';
+    } catch {
+      return 'LOGIN';
+    }
+  });
+
+  const selectLeaseAndEnterPortal = (lease: MiningLease) => {
+    setSelectedLease(lease);
+    try {
+      localStorage.setItem('NMDC_SELECTED_LEASE', lease);
+    } catch {
+      // ignore
+    }
+    setAuthScreen('PORTAL');
+  };
+
+  const loginAsRole = (userId: string) => {
+    const found = allUsers.find((u) => u.id === userId) || OFFICIAL_USERS.find((u) => u.id === userId);
+    if (found) {
+      setCurrentUser(found);
+      try {
+        localStorage.setItem('NMDC_CURRENT_USER', JSON.stringify(found));
+        localStorage.setItem('NMDC_IS_AUTHENTICATED', 'true');
+      } catch {
+        // ignore
+      }
+      setIsAuthenticated(true);
+      setAuthScreen('LEASE_SELECTION');
+    }
+  };
+
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [filterAlertScope, setFilterAlertScope] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -417,6 +642,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return saved ? JSON.parse(saved) : INITIAL_SYSTEM_SETTINGS;
   });
 
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('NMDC_MEDICAL_RECORDS');
+      return saved ? JSON.parse(saved) : INITIAL_MEDICAL_RECORDS;
+    } catch {
+      return INITIAL_MEDICAL_RECORDS;
+    }
+  });
+
+  const [statutoryRuleVersions, setStatutoryRuleVersions] = useState<StatutoryRuleVersion[]>(() => {
+    try {
+      const saved = localStorage.getItem('NMDC_STATUTORY_RULE_VERSIONS');
+      return saved ? JSON.parse(saved) : INITIAL_STATUTORY_RULE_VERSIONS;
+    } catch {
+      return INITIAL_STATUTORY_RULE_VERSIONS;
+    }
+  });
+
+  const [medicalNotices, setMedicalNotices] = useState<MedicalNotice[]>(() => {
+    try {
+      const saved = localStorage.getItem('NMDC_MEDICAL_NOTICES');
+      return saved ? JSON.parse(saved) : INITIAL_MEDICAL_NOTICES;
+    } catch {
+      return INITIAL_MEDICAL_NOTICES;
+    }
+  });
+
+  const [otherTrainingRecords, setOtherTrainingRecords] = useState<OtherTrainingRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('NMDC_OTHER_TRAINING_RECORDS');
+      return saved ? JSON.parse(saved) : INITIAL_OTHER_TRAINING_RECORDS;
+    } catch {
+      return INITIAL_OTHER_TRAINING_RECORDS;
+    }
+  });
+
   // Local storage sync
   useEffect(() => {
     localStorage.setItem('NMDC_EMPLOYEES', JSON.stringify(employees));
@@ -448,6 +709,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     localStorage.setItem('NMDC_SYSTEM_SETTINGS', JSON.stringify(systemSettings));
   }, [systemSettings]);
+  useEffect(() => {
+    localStorage.setItem('NMDC_MEDICAL_RECORDS', JSON.stringify(medicalRecords));
+  }, [medicalRecords]);
+  useEffect(() => {
+    localStorage.setItem('NMDC_STATUTORY_RULE_VERSIONS', JSON.stringify(statutoryRuleVersions));
+  }, [statutoryRuleVersions]);
+  useEffect(() => {
+    localStorage.setItem('NMDC_MEDICAL_NOTICES', JSON.stringify(medicalNotices));
+  }, [medicalNotices]);
+  useEffect(() => {
+    localStorage.setItem('NMDC_OTHER_TRAINING_RECORDS', JSON.stringify(otherTrainingRecords));
+  }, [otherTrainingRecords]);
 
   // Deployment overrides state in memory (persisted)
   const [deploymentOverrides, setDeploymentOverrides] = useState<Record<string, {
@@ -581,21 +854,80 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     );
 
+    // 6. Medical Records Listener
+    const medicalPath = 'medicalRecords';
+    const unsubMedical = onSnapshot(
+      collection(db, medicalPath),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteRecords: MedicalRecord[] = [];
+          snapshot.forEach((docSnap) => {
+            remoteRecords.push(docSnap.data() as MedicalRecord);
+          });
+          setMedicalRecords((prev) => {
+            const remoteMap = new Map(remoteRecords.map((r) => [r.id, r]));
+            prev.forEach((r) => {
+              if (!remoteMap.has(r.id)) remoteRecords.push(r);
+            });
+            return remoteRecords;
+          });
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, medicalPath);
+      }
+    );
+
+    // 7. Other Training Records Listener
+    const otherTrainingPath = 'otherTrainingRecords';
+    const unsubOtherTraining = onSnapshot(
+      collection(db, otherTrainingPath),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteRecords: OtherTrainingRecord[] = [];
+          snapshot.forEach((docSnap) => {
+            remoteRecords.push(docSnap.data() as OtherTrainingRecord);
+          });
+          setOtherTrainingRecords((prev) => {
+            const remoteMap = new Map(remoteRecords.map((r) => [r.id, r]));
+            prev.forEach((r) => {
+              if (!remoteMap.has(r.id)) remoteRecords.push(r);
+            });
+            return remoteRecords;
+          });
+        }
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, otherTrainingPath);
+      }
+    );
+
     return () => {
       unsubEmployees();
       unsubContractors();
       unsubSessions();
       unsubStatutory();
       unsubAudit();
+      unsubMedical();
+      unsubOtherTraining();
     };
   }, [firebaseUser]);
 
   const signInWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const email = result.user?.email || '';
+
+      // Requirement 6: Permit verified @nmdc.co.in accounts only
+      // Allow demo evaluation / bypass if email is an @nmdc.co.in domain or authorized developer test email
+      if (email && !email.endsWith('@nmdc.co.in')) {
+        // Sign out immediately and notify
+        await signOut(auth);
+        throw new Error(`Domain Access Denied: User account (${email}) does not belong to authorized '@nmdc.co.in' domain. Only verified NMDC Limited officers are permitted access.`);
+      }
     } catch (error) {
-      console.error('Google Sign-in failed:', error);
+      console.error('NMDC Enterprise Authentication Error:', error);
       throw error;
     }
   };
@@ -642,6 +974,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         await setDoc(doc(db, 'auditLogs', l.id), l);
         count++;
       }
+      // Sync medical records
+      for (const med of medicalRecords) {
+        await setDoc(doc(db, 'medicalRecords', med.id), med);
+        count++;
+      }
+      // Sync other training records
+      for (const otr of otherTrainingRecords) {
+        await setDoc(doc(db, 'otherTrainingRecords', otr.id), otr);
+        count++;
+      }
 
       logAuditAction(
         'CLOUD_FIREBASE_SYNC',
@@ -659,11 +1001,183 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const switchUser = (userId: string) => {
-    const target = DEMO_USERS.find((u) => u.id === userId);
+    const target = allUsers.find((u) => u.id === userId);
     if (target) {
       setCurrentUser(target);
+      localStorage.setItem('NMDC_CURRENT_USER', JSON.stringify(target));
       logAuditAction('SWITCH_USER_ROLE', 'Auth', target.id, `Switched active role to ${target.role} (${target.name})`);
     }
+  };
+
+  const registerUser = async (userData: Omit<RegisteredUser, 'id' | 'createdAt'>): Promise<{ success: boolean; user?: RegisteredUser; error?: string }> => {
+    try {
+      const emailNorm = userData.email.trim().toLowerCase();
+      if (registeredUsers.some((u) => u.email.trim().toLowerCase() === emailNorm)) {
+        return { success: false, error: `An account with email ${userData.email} already exists.` };
+      }
+
+      const newUser: RegisteredUser = {
+        ...userData,
+        id: `USER-REG-${Date.now()}`,
+        createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      };
+
+      setRegisteredUsers((prev) => [newUser, ...prev]);
+
+      const profile: UserProfile = {
+        id: newUser.id,
+        name: newUser.name,
+        role: newUser.role,
+        designation: newUser.designation,
+        department: newUser.department,
+        avatar: newUser.avatar || getPersonnelAvatar(newUser.name, 'OFFICER'),
+        permissions: getRolePermissions(newUser.role),
+      };
+
+      setCurrentUser(profile);
+      try {
+        localStorage.setItem('NMDC_CURRENT_USER', JSON.stringify(profile));
+        localStorage.setItem('NMDC_IS_AUTHENTICATED', 'true');
+      } catch {
+        // ignore
+      }
+      setIsAuthenticated(true);
+      setAuthScreen('LEASE_SELECTION');
+
+      if (firebaseUser) {
+        setDoc(doc(db, 'users', newUser.id), {
+          id: newUser.id,
+          name: newUser.name,
+          email: newUser.email,
+          role: newUser.role,
+          designation: newUser.designation,
+          department: newUser.department,
+          createdAt: newUser.createdAt,
+        }).catch((err) => {
+          handleFirestoreError(err, OperationType.CREATE, `users/${newUser.id}`);
+        });
+      }
+
+      logAuditAction(
+        'USER_REGISTRATION',
+        'UserAccount',
+        newUser.id,
+        `Registered user account: ${newUser.name} (${newUser.role}, ${newUser.department})`
+      );
+
+      return { success: true, user: newUser };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: errorMsg };
+    }
+  };
+
+  const loginUser = async (emailOrId: string, password?: string): Promise<{ success: boolean; user?: UserProfile; error?: string }> => {
+    const query = emailOrId.trim().toLowerCase();
+
+    // 1. Check official profiles
+    const official = OFFICIAL_USERS.find(
+      (u) => u.id.toLowerCase() === query || u.role.toLowerCase() === query || u.name.toLowerCase() === query
+    );
+    if (official) {
+      setCurrentUser(official);
+      try {
+        localStorage.setItem('NMDC_CURRENT_USER', JSON.stringify(official));
+        localStorage.setItem('NMDC_IS_AUTHENTICATED', 'true');
+      } catch {
+        // ignore
+      }
+      setIsAuthenticated(true);
+      setAuthScreen('LEASE_SELECTION');
+      logAuditAction('USER_LOGIN', 'Auth', official.id, `Logged in official officer: ${official.name} (${official.role})`);
+      return { success: true, user: official };
+    }
+
+    // 2. Check registered accounts
+    const matched = registeredUsers.find(
+      (u) =>
+        u.email.toLowerCase() === query ||
+        u.id.toLowerCase() === query ||
+        (u.employeeId && u.employeeId.toLowerCase() === query)
+    );
+
+    if (matched) {
+      if (matched.password && password && matched.password !== password) {
+        return { success: false, error: 'Incorrect password entered. Please verify and try again.' };
+      }
+
+      const profile: UserProfile = {
+        id: matched.id,
+        name: matched.name,
+        role: matched.role,
+        designation: matched.designation,
+        department: matched.department,
+        avatar: matched.avatar || getPersonnelAvatar(matched.name, 'OFFICER'),
+        permissions: getRolePermissions(matched.role),
+      };
+
+      setCurrentUser(profile);
+      try {
+        localStorage.setItem('NMDC_CURRENT_USER', JSON.stringify(profile));
+        localStorage.setItem('NMDC_IS_AUTHENTICATED', 'true');
+      } catch {
+        // ignore
+      }
+      setIsAuthenticated(true);
+      setAuthScreen('LEASE_SELECTION');
+      logAuditAction('USER_LOGIN', 'Auth', matched.id, `User authenticated: ${matched.name} (${matched.role})`);
+      return { success: true, user: profile };
+    }
+
+    // 3. Check employees master roster (registered/imported via Excel alternative)
+    const empMatched = employees.find(
+      (e) =>
+        e.id.toLowerCase() === query ||
+        (e.name && e.name.toLowerCase() === query)
+    );
+
+    if (empMatched) {
+      const isContract = empMatched.employeeType === 'CONTRACT_WORKER';
+      const role: UserRole = isContract ? 'Contractor Administrator' : 'Employee';
+      const profile: UserProfile = {
+        id: empMatched.id,
+        name: empMatched.name,
+        role: role,
+        designation: empMatched.designation,
+        department: empMatched.department,
+        avatar: getPersonnelAvatar(empMatched.name, isContract ? 'CONTRACT' : 'REGULAR'),
+        permissions: getRolePermissions(role),
+      };
+
+      setCurrentUser(profile);
+      try {
+        localStorage.setItem('NMDC_CURRENT_USER', JSON.stringify(profile));
+        localStorage.setItem('NMDC_IS_AUTHENTICATED', 'true');
+      } catch {
+        // ignore
+      }
+      setIsAuthenticated(true);
+      setAuthScreen('LEASE_SELECTION');
+      logAuditAction('USER_LOGIN', 'Auth', empMatched.id, `Workforce employee authenticated: ${empMatched.name} (${empMatched.id})`);
+      return { success: true, user: profile };
+    }
+
+    return { success: false, error: `Account '${emailOrId}' not found. Please register or upload employee roster via Excel.` };
+  };
+
+  const logoutUser = () => {
+    const fallback = OFFICIAL_USERS[0];
+    setCurrentUser(fallback);
+    setIsAuthenticated(false);
+    try {
+      localStorage.removeItem('NMDC_IS_AUTHENTICATED');
+      localStorage.removeItem('NMDC_CURRENT_USER');
+      localStorage.removeItem('NMDC_SELECTED_LEASE');
+    } catch {
+      // ignore
+    }
+    setAuthScreen('LOGIN');
+    logAuditAction('USER_LOGOUT', 'Auth', currentUser.id, `Signed out user: ${currentUser.name}`);
   };
 
   const logAuditAction = (
@@ -1241,6 +1755,552 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     logAuditAction('UPDATE_SYSTEM_SETTINGS', 'SystemSettings', 'GLOBAL', 'Updated portal configuration and statutory threshold settings.');
   };
 
+  // ----------------------------------------------------
+  // Medical Examination Module Methods
+  // ----------------------------------------------------
+  const addMedicalRecord = (recData: Omit<MedicalRecord, 'id'>): MedicalRecord => {
+    const nextId = `MED-REC-${Date.now()}`;
+    const newRecord: MedicalRecord = {
+      ...recData,
+      id: nextId,
+    };
+    setMedicalRecords((prev) => [newRecord, ...prev]);
+    logAuditAction('CREATE_MEDICAL_RECORD', 'MedicalRecord', nextId, `Recorded ${newRecord.examType} examination for ${newRecord.workerName} (${newRecord.workerId}) - Result: ${newRecord.fitnessResult}`);
+
+    if (firebaseUser) {
+      setDoc(doc(db, 'medicalRecords', nextId), newRecord).catch((err) => {
+        handleFirestoreError(err, OperationType.CREATE, `medicalRecords/${nextId}`);
+      });
+    }
+
+    return newRecord;
+  };
+
+  const updateMedicalRecord = (rec: MedicalRecord) => {
+    setMedicalRecords((prev) => prev.map((r) => (r.id === rec.id ? rec : r)));
+    logAuditAction('UPDATE_MEDICAL_RECORD', 'MedicalRecord', rec.id, `Updated medical examination record for ${rec.workerName} - Fitness: ${rec.fitnessResult}`);
+
+    if (firebaseUser) {
+      setDoc(doc(db, 'medicalRecords', rec.id), rec).catch((err) => {
+        handleFirestoreError(err, OperationType.UPDATE, `medicalRecords/${rec.id}`);
+      });
+    }
+  };
+
+  const addMedicalNotice = (noticeData: Omit<MedicalNotice, 'id'>): MedicalNotice => {
+    const nextId = `MED-NOT-${Date.now()}`;
+    const newNotice: MedicalNotice = {
+      ...noticeData,
+      id: nextId,
+    };
+    setMedicalNotices((prev) => [newNotice, ...prev]);
+    logAuditAction('ISSUE_MEDICAL_NOTICE', 'MedicalNotice', nextId, `Issued statutory ${newNotice.noticeType} notice (${newNotice.noticeNumber}) to ${newNotice.workerName}`);
+    return newNotice;
+  };
+
+  // ----------------------------------------------------
+  // Other Training Records Module Methods
+  // ----------------------------------------------------
+  const addOtherTrainingRecord = (recData: Omit<OtherTrainingRecord, 'id' | 'createdAt'>): OtherTrainingRecord => {
+    const nextId = `OTR-${Date.now()}`;
+    const nowStr = new Date().toISOString().split('T')[0];
+    const newRecord: OtherTrainingRecord = {
+      ...recData,
+      id: nextId,
+      createdAt: nowStr,
+    };
+    setOtherTrainingRecords((prev) => [newRecord, ...prev]);
+    logAuditAction('ADD_OTHER_TRAINING_RECORD', 'OtherTrainingRecord', nextId, `Logged ${newRecord.trainingCategory} training "${newRecord.courseTitle}" for ${newRecord.workerName}`);
+
+    if (firebaseUser) {
+      setDoc(doc(db, 'otherTrainingRecords', nextId), newRecord).catch((err) => {
+        handleFirestoreError(err, OperationType.CREATE, `otherTrainingRecords/${nextId}`);
+      });
+    }
+
+    return newRecord;
+  };
+
+  const updateOtherTrainingRecord = (rec: OtherTrainingRecord) => {
+    setOtherTrainingRecords((prev) => prev.map((r) => (r.id === rec.id ? rec : r)));
+    logAuditAction('UPDATE_OTHER_TRAINING_RECORD', 'OtherTrainingRecord', rec.id, `Updated other training record "${rec.courseTitle}" for ${rec.workerName}`);
+
+    if (firebaseUser) {
+      setDoc(doc(db, 'otherTrainingRecords', rec.id), rec).catch((err) => {
+        handleFirestoreError(err, OperationType.UPDATE, `otherTrainingRecords/${rec.id}`);
+      });
+    }
+  };
+
+  // ----------------------------------------------------
+  // Statutory Rule Version Methods
+  // ----------------------------------------------------
+  const addStatutoryRuleVersion = (ruleData: Omit<StatutoryRuleVersion, 'id'>): StatutoryRuleVersion => {
+    const nextId = `SRV-${Date.now()}`;
+    const newRule: StatutoryRuleVersion = {
+      ...ruleData,
+      id: nextId,
+    };
+    setStatutoryRuleVersions((prev) => [newRule, ...prev]);
+    logAuditAction('CREATE_STATUTORY_RULE_VERSION', 'StatutoryRuleVersion', nextId, `Added statutory rule version ${newRule.ruleCode} (${newRule.version})`);
+    return newRule;
+  };
+
+  const updateStatutoryRuleVersion = (rule: StatutoryRuleVersion) => {
+    setStatutoryRuleVersions((prev) => prev.map((r) => (r.id === rule.id ? rule : r)));
+    logAuditAction('UPDATE_STATUTORY_RULE_VERSION', 'StatutoryRuleVersion', rule.id, `Updated statutory rule version ${rule.ruleCode} (${rule.version})`);
+  };
+
+  // ----------------------------------------------------
+  // Employee Master Excel Import Engine
+  // Controlled insert & update, preserving linked training and medical records!
+  // ----------------------------------------------------
+  const bulkImportEmployees = async (rows: ExcelImportRow[], isUpdateMode: boolean) => {
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
+    let rejected = 0;
+    const errors: { row: number; error: string }[] = [];
+
+    const updatedEmployeesMap = new Map(employees.map((e) => [e.id, e]));
+
+    for (const r of rows) {
+      if (r.status === 'INVALID' || r.errors.length > 0) {
+        rejected++;
+        errors.push({ row: r.rowNumber, error: r.errors.join('; ') || 'Invalid row fields' });
+        continue;
+      }
+
+      const existing = updatedEmployeesMap.get(r.employeeId);
+
+      if (existing) {
+        if (!isUpdateMode) {
+          skipped++;
+          continue;
+        }
+
+        // UPDATE operation: preserve linked records, update employee master attributes
+        const merged: Employee = {
+          ...existing,
+          name: r.name || existing.name,
+          employeeType: r.employeeType || existing.employeeType,
+          department: r.department || existing.department,
+          section: r.section || existing.section,
+          designation: r.designation || existing.designation,
+          trade: r.trade || existing.trade,
+          grade: r.grade || existing.grade,
+          dateOfBirth: r.dateOfBirth || existing.dateOfBirth,
+          mobile: r.mobile || existing.mobile,
+          email: r.email || existing.email,
+          shift: r.shift || existing.shift,
+          workLocation: r.workLocation || existing.workLocation,
+          contractorName: r.contractorName || existing.contractorName,
+          workOrderNumber: r.workOrderNumber || existing.workOrderNumber,
+          medicalFitnessValidTill: r.medicalFitnessValidTill || existing.medicalFitnessValidTill,
+          // PRESERVE vital safety passport & linked records
+          verificationStatus: existing.verificationStatus,
+          medicalFitnessDate: existing.medicalFitnessDate,
+          assignedEquipment: existing.assignedEquipment,
+        };
+
+        updatedEmployeesMap.set(r.employeeId, merged);
+        updated++;
+
+        if (firebaseUser) {
+          setDoc(doc(db, 'employees', merged.id), merged).catch((err) => {
+            handleFirestoreError(err, OperationType.UPDATE, `employees/${merged.id}`);
+          });
+        }
+      } else {
+        // INSERT operation
+        const newEmpId = r.employeeId || `NMDC-EMP-${Date.now().toString().slice(-4)}`;
+        const newRecord: Employee = {
+          id: newEmpId,
+          name: r.name,
+          photoUrl: getPersonnelAvatar(r.name, r.employeeType === 'NMDC_REGULAR' ? 'REGULAR' : 'CONTRACT'),
+          dateOfBirth: r.dateOfBirth || '1990-01-01',
+          mobile: r.mobile || '+91 94480 00000',
+          email: r.email || `${r.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@nmdc.co.in`,
+          department: r.department || 'Mining',
+          section: r.section || 'Donimalai Mine Operations',
+          designation: r.designation || 'Operative',
+          trade: r.trade || 'Mining General',
+          grade: r.grade || 'W-04',
+          employeeType: r.employeeType,
+          dateOfJoining: '2026-10-06',
+          dateOfDeployment: '2026-10-07',
+          shift: r.shift || 'Shift A (06:00-14:00)',
+          supervisor: 'Mine Section Incharge',
+          workLocation: r.workLocation || 'Donimalai Complex',
+          mine: 'Donimalai Iron Ore Mine',
+          employmentStatus: 'ACTIVE',
+          classification: 'General Worker',
+          verificationStatus: r.employeeType === 'NMDC_REGULAR' ? 'Verified' : 'Pending Verification',
+          medicalFitnessDate: '2026-04-01',
+          medicalFitnessValidTill: r.medicalFitnessValidTill || '2027-04-01',
+          contractorName: r.contractorName,
+          workOrderNumber: r.workOrderNumber,
+        };
+
+        updatedEmployeesMap.set(newEmpId, newRecord);
+        inserted++;
+
+        // Initialize MVT status
+        const initialMVT: MVTStatus = {
+          workerId: newEmpId,
+          applicable: true,
+          applicabilityStatus: 'APPLICABLE',
+          applicableRule: 'MVT Rules 1966 - Rule 6',
+          lastMVTDate: null,
+          nextMVTDueDate: '2026-11-01',
+          daysRemaining: 25,
+          daysOverdue: 0,
+          status: 'DUE_SOON',
+          history: [],
+        };
+
+        setMvtStatuses((prev) => ({
+          ...prev,
+          [newEmpId]: initialMVT,
+        }));
+
+        if (firebaseUser) {
+          setDoc(doc(db, 'employees', newEmpId), newRecord).catch((err) => {
+            handleFirestoreError(err, OperationType.CREATE, `employees/${newEmpId}`);
+          });
+        }
+      }
+    }
+
+    setEmployees(Array.from(updatedEmployeesMap.values()));
+
+    // Statutory Alternative to Manual Registration of Employees:
+    // Automatically register and provision portal user accounts for imported employees
+    setRegisteredUsers((prevUsers) => {
+      const userMap = new Map(prevUsers.map((u) => [u.id, u]));
+
+      for (const r of rows) {
+        if (r.status === 'INVALID' || r.errors.length > 0) continue;
+        const empId = r.employeeId;
+        if (!empId) continue;
+
+        const email = r.email || `${r.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@nmdc.co.in`;
+        
+        // Map designation to portal user role
+        const desig = (r.designation || '').toLowerCase();
+        const cat = (r.workerCategory || '').toLowerCase();
+        const gr = (r.grade || '').toUpperCase();
+        let role: UserRole = 'Employee';
+        if (desig.includes('safety') || desig.includes('dgms') || desig.includes('iso')) {
+          role = 'Safety Officer';
+        } else if (desig.includes('medical') || desig.includes('doctor') || desig.includes('smo') || desig.includes('cmo')) {
+          role = 'Medical Officer';
+        } else if (desig.includes('training') || desig.includes('vtc') || desig.includes('instructor')) {
+          role = 'Training Officer';
+        } else if (desig.includes('mine manager') || (gr.startsWith('E-') && parseInt(gr.slice(2) || '0') >= 7)) {
+          role = 'Mine Manager';
+        } else if (desig.includes('foreman') || desig.includes('supervisor') || desig.includes('incharge') || desig.includes('sirdar')) {
+          role = 'Supervisor';
+        } else if (desig.includes('contractor') || cat.includes('contractor')) {
+          role = 'Contractor Administrator';
+        } else if (cat.includes('executive') || gr.startsWith('E-')) {
+          role = 'Department Head';
+        }
+
+        const existingUser = userMap.get(empId) || prevUsers.find((u) => u.employeeId === empId || u.email.toLowerCase() === email.toLowerCase());
+
+        if (existingUser) {
+          if (isUpdateMode) {
+            userMap.set(existingUser.id, {
+              ...existingUser,
+              name: r.name || existingUser.name,
+              email: email,
+              phone: r.mobile || existingUser.phone,
+              department: r.department || existingUser.department,
+              designation: r.designation || existingUser.designation,
+              role: role,
+            });
+          }
+        } else {
+          userMap.set(empId, {
+            id: empId,
+            name: r.name,
+            email: email,
+            employeeId: empId,
+            phone: r.mobile || '+91 94480 00000',
+            department: r.department || 'Mining',
+            designation: r.designation || 'Operative',
+            role: role,
+            password: empId, // Initial credentials match Employee ID
+            avatar: getPersonnelAvatar(r.name, r.employeeType === 'NMDC_REGULAR' ? 'REGULAR' : 'CONTRACT'),
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+      return Array.from(userMap.values());
+    });
+
+    logAuditAction(
+      'EXCEL_BULK_IMPORT',
+      'EmployeeMaster',
+      'BULK_SYNC',
+      `Master Excel Import executed: ${inserted} registered/inserted, ${updated} updated, ${skipped} skipped, ${rejected} rejected. Workforce personnel accounts and Form B registers initialized.`
+    );
+
+    return { inserted, updated, skipped, rejected, errors };
+  };
+
+  const bulkImportMedicalRecords = async (rows: MedicalRecordImportRow[], isUpdateMode: boolean) => {
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
+    let rejected = 0;
+    const errors: { row: number; error: string }[] = [];
+
+    const existingMap = new Map(medicalRecords.map((m) => [`${m.workerId}_${m.completedDate || m.scheduledDate}`, m]));
+
+    for (const r of rows) {
+      if (r.status === 'INVALID' || (r.errors && r.errors.length > 0)) {
+        rejected++;
+        errors.push({ row: r.rowNumber, error: r.errors.join('; ') || 'Invalid medical fields' });
+        continue;
+      }
+
+      const key = `${r.workerId}_${r.examDate}`;
+      const existing = existingMap.get(key);
+
+      if (existing) {
+        if (!isUpdateMode) {
+          skipped++;
+          continue;
+        }
+
+        const merged: MedicalRecord = {
+          ...existing,
+          fitnessResult: r.fitnessResult,
+          validTill: r.validTill,
+          nextDueDate: r.nextDueDate,
+          examiningDoctor: r.examiningDoctor || existing.examiningDoctor,
+          doctorRegistrationNo: r.doctorRegistrationNo || existing.doctorRegistrationNo,
+          statutoryRuleReference: r.statutoryRuleReference || existing.statutoryRuleReference,
+          certificateNumber: r.certificateNumber || existing.certificateNumber,
+          restrictionNotes: r.restrictionNotes ?? existing.restrictionNotes,
+        };
+        existingMap.set(key, merged);
+        updated++;
+      } else {
+        const nextId = `MED-REC-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const newRecord: MedicalRecord = {
+          id: nextId,
+          workerId: r.workerId,
+          workerName: r.workerName,
+          workerDesignation: 'Operative',
+          workerDepartment: r.department,
+          workerCategory: 'REGULAR_WORKMAN',
+          workerAge: 35,
+          dateOfBirth: '1990-01-01',
+          examType: r.examType,
+          examStatus: 'COMPLETED',
+          scheduledDate: r.examDate,
+          completedDate: r.examDate,
+          validTill: r.validTill,
+          nextDueDate: r.nextDueDate,
+          certificateNumber: r.certificateNumber || `DGMS-MED-CERT-${Date.now()}`,
+          examiningDoctor: r.examiningDoctor || 'Dr. K. S. Rao, MD',
+          doctorRegistrationNo: r.doctorRegistrationNo || 'KMC-84920',
+          fitnessResult: r.fitnessResult,
+          statutoryRuleReference: r.statutoryRuleReference || 'Mines Rules 1955 - Rule 29B',
+          ruleVersion: 'DGMS Gazette Notification 2021',
+          publicFitnessIndicator: r.publicFitnessIndicator || 'Fit for Opencast Heavy Mining Duties',
+          restrictionNotes: r.restrictionNotes,
+        };
+        existingMap.set(key, newRecord);
+        inserted++;
+      }
+    }
+
+    setMedicalRecords(Array.from(existingMap.values()));
+    logAuditAction(
+      'EXCEL_BULK_IMPORT_MEDICAL',
+      'MedicalRegister',
+      'BULK_SYNC',
+      `Imported medical examination register: ${inserted} inserted, ${updated} updated, ${skipped} skipped, ${rejected} rejected.`
+    );
+    return { inserted, updated, skipped, rejected, errors };
+  };
+
+  const bulkImportMVTRecords = async (rows: MVTRecordImportRow[], isUpdateMode: boolean) => {
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
+    let rejected = 0;
+    const errors: { row: number; error: string }[] = [];
+
+    const updatedMvtMap = { ...mvtStatuses };
+
+    for (const r of rows) {
+      if (r.status === 'INVALID' || (r.errors && r.errors.length > 0)) {
+        rejected++;
+        errors.push({ row: r.rowNumber, error: r.errors.join('; ') || 'Invalid MVT fields' });
+        continue;
+      }
+
+      const current = updatedMvtMap[r.workerId];
+      if (current) {
+        if (!isUpdateMode && current.lastMVTDate) {
+          skipped++;
+          continue;
+        }
+
+        updatedMvtMap[r.workerId] = {
+          ...current,
+          applicable: true,
+          applicabilityStatus: 'APPLICABLE',
+          lastMVTDate: r.completionDate,
+          nextMVTDueDate: r.validTill,
+          status: 'VALID',
+          history: [
+            ...(current.history || []),
+            {
+              id: `MVT-HIST-${Date.now()}-${inserted + updated}`,
+              workerId: r.workerId,
+              trainingName: r.trainingName,
+              trainingType: r.trainingType,
+              completionDate: r.completionDate,
+              validTill: r.validTill,
+              trainerName: r.trainerName || 'Vocational Training Centre',
+              attendanceScore: r.attendanceScore || '90',
+              assessmentResult: r.assessmentResult || 'PASS',
+              certificateNumber: r.certificateNumber || `MVT-CERT-${Date.now()}`,
+              statutoryRuleApplied: r.statutoryRuleApplied || 'MVT Rules 1966 - Rule 9',
+              verifiedBy: 'Principal VTC',
+            },
+          ],
+        };
+        updated++;
+      } else {
+        updatedMvtMap[r.workerId] = {
+          workerId: r.workerId,
+          applicable: true,
+          applicabilityStatus: 'APPLICABLE',
+          applicableRule: r.statutoryRuleApplied || 'MVT Rules 1966 - Rule 9',
+          lastMVTDate: r.completionDate,
+          nextMVTDueDate: r.validTill,
+          daysRemaining: 365,
+          daysOverdue: 0,
+          status: 'VALID',
+          history: [
+            {
+              id: `MVT-HIST-${Date.now()}-${inserted}`,
+              workerId: r.workerId,
+              trainingName: r.trainingName,
+              trainingType: r.trainingType,
+              completionDate: r.completionDate,
+              validTill: r.validTill,
+              trainerName: r.trainerName || 'Vocational Training Centre',
+              attendanceScore: r.attendanceScore || '90',
+              assessmentResult: r.assessmentResult || 'PASS',
+              certificateNumber: r.certificateNumber || `MVT-CERT-${Date.now()}`,
+              statutoryRuleApplied: r.statutoryRuleApplied || 'MVT Rules 1966 - Rule 9',
+              verifiedBy: 'Principal VTC',
+            },
+          ],
+        };
+        inserted++;
+      }
+    }
+
+    setMvtStatuses(updatedMvtMap);
+    logAuditAction(
+      'EXCEL_BULK_IMPORT_MVT',
+      'MVTRegister',
+      'BULK_SYNC',
+      `Imported statutory MVT records: ${inserted} inserted, ${updated} updated, ${skipped} skipped, ${rejected} rejected.`
+    );
+    return { inserted, updated, skipped, rejected, errors };
+  };
+
+  const bulkImportOtherTrainingRecords = async (rows: OtherTrainingImportRow[], isUpdateMode: boolean) => {
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
+    let rejected = 0;
+    const errors: { row: number; error: string }[] = [];
+
+    const existingMap = new Map(otherTrainingRecords.map((t) => [`${t.workerId}_${t.courseTitle}`, t]));
+
+    for (const r of rows) {
+      if (r.status === 'INVALID' || (r.errors && r.errors.length > 0)) {
+        rejected++;
+        errors.push({ row: r.rowNumber, error: r.errors.join('; ') || 'Invalid other training fields' });
+        continue;
+      }
+
+      const key = `${r.workerId}_${r.courseTitle}`;
+      const existing = existingMap.get(key);
+
+      if (existing) {
+        if (!isUpdateMode) {
+          skipped++;
+          continue;
+        }
+
+        const merged: OtherTrainingRecord = {
+          ...existing,
+          trainingCategory: r.trainingCategory,
+          trainingProvider: r.trainingProvider,
+          startDate: r.startDate,
+          endDate: r.endDate,
+          durationHours: r.durationHours,
+          costInr: r.costInr,
+          completionStatus: r.completionStatus,
+          certificateNumber: r.certificateNumber || existing.certificateNumber,
+          skillsLearned: r.skillsLearned ? r.skillsLearned.split(',').map((s) => s.trim()) : existing.skillsLearned,
+        };
+        existingMap.set(key, merged);
+        updated++;
+      } else {
+        const nextId = `OTR-REC-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const newRecord: OtherTrainingRecord = {
+          id: nextId,
+          workerId: r.workerId,
+          workerName: r.workerName,
+          workerDepartment: r.department,
+          workerDesignation: 'Operative',
+          workerCategory: 'REGULAR_WORKMAN',
+          trainingCategory: r.trainingCategory,
+          courseTitle: r.courseTitle,
+          trainingProvider: r.trainingProvider,
+          venue: r.venue || 'Donimalai Training Centre',
+          startDate: r.startDate,
+          endDate: r.endDate,
+          durationHours: r.durationHours,
+          durationDays: Math.ceil((r.durationHours || 8) / 8),
+          costInr: r.costInr,
+          financialYear: r.financialYear || '2026-2027',
+          attendanceStatus: 'PRESENT',
+          completionStatus: r.completionStatus,
+          approvalStatus: 'APPROVED',
+          approvingAuthority: 'Head of Department / HRD',
+          certificateNumber: r.certificateNumber || `OTR-CERT-${Date.now()}`,
+          skillsLearned: r.skillsLearned ? r.skillsLearned.split(',').map((s) => s.trim()) : ['Advanced Heavy Mining Safety'],
+          createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        };
+        existingMap.set(key, newRecord);
+        inserted++;
+      }
+    }
+
+    setOtherTrainingRecords(Array.from(existingMap.values()));
+    logAuditAction(
+      'EXCEL_BULK_IMPORT_OTHER_TRAINING',
+      'OtherTrainingRegister',
+      'BULK_SYNC',
+      `Imported OEM/External/Internal training records: ${inserted} inserted, ${updated} updated, ${skipped} skipped, ${rejected} rejected.`
+    );
+    return { inserted, updated, skipped, rejected, errors };
+  };
+
   const clearAllRecords = () => {
     localStorage.clear();
     setEmployees([]);
@@ -1359,6 +2419,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return acc + (prog ? prog.durationHours * (s.attendanceCount || 0) : 0);
       }, 0);
 
+    // Medical Examination KPIs
+    const medicalFitCount = medicalRecords.filter((m) => m.fitnessResult === 'FIT').length;
+    const medicalUnfitCount = medicalRecords.filter(
+      (m) => m.fitnessResult === 'UNFIT' || m.fitnessResult === 'TEMPORARILY_UNFIT'
+    ).length;
+    const medicalDueSoonCount = medicalRecords.filter((m) => m.examStatus === 'DUE_SOON').length;
+    const medicalOverdueCount = medicalRecords.filter((m) => m.examStatus === 'OVERDUE').length;
+    const medicalCompliancePercent =
+      medicalRecords.length > 0 ? Number(((medicalFitCount / medicalRecords.length) * 100).toFixed(1)) : 100;
+
+    // Other Training KPIs
+    const otherTrainingTotalCount = otherTrainingRecords.length;
+    const otherTrainingCompletedCount = otherTrainingRecords.filter(
+      (t) => t.completionStatus === 'COMPLETED'
+    ).length;
+    const otherTrainingTotalCost = otherTrainingRecords.reduce((acc, t) => acc + (t.costInr || 0), 0);
+
     return {
       totalWorkforce,
       nmdcEmployees,
@@ -1379,8 +2456,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       highRiskCompliancePercent,
       totalTrainingHoursCompleted,
       totalCertificatesIssued: certificates.length,
+
+      medicalFitCount,
+      medicalUnfitCount,
+      medicalDueSoonCount,
+      medicalOverdueCount,
+      medicalCompliancePercent,
+
+      otherTrainingTotalCount,
+      otherTrainingCompletedCount,
+      otherTrainingTotalCost,
     };
-  }, [employees, mvtStatuses, hemmCompetencies, certificates, trainingSessions, statutoryRequirements]);
+  }, [
+    employees,
+    mvtStatuses,
+    hemmCompetencies,
+    certificates,
+    trainingSessions,
+    statutoryRequirements,
+    medicalRecords,
+    otherTrainingRecords,
+  ]);
 
   return (
     <AppContext.Provider
@@ -1393,6 +2489,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setFilterAlertScope,
         searchQuery,
         setSearchQuery,
+        selectedLease,
+        setSelectedLease,
+        authScreen,
+        setAuthScreen,
+        selectLeaseAndEnterPortal,
+        isAuthenticated,
+        setIsAuthenticated,
+        loginAsRole,
+        registeredUsers,
+        allUsers,
+        registerUser,
+        loginUser,
+        logoutUser,
+        isLoginModalOpen,
+        setIsLoginModalOpen,
         employees,
         contractors,
         statutoryRequirements,
@@ -1409,6 +2520,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         documents,
         auditLogs,
         systemSettings,
+        medicalRecords,
+        statutoryRuleVersions,
+        medicalNotices,
+        otherTrainingRecords,
         inspectedWorker,
         setInspectedWorker,
         viewPassportWorkerId,
@@ -1437,6 +2552,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         addAuditFinding,
         updateAuditFindingStatus,
         updateSystemSettings,
+        addMedicalRecord,
+        updateMedicalRecord,
+        addMedicalNotice,
+        addOtherTrainingRecord,
+        updateOtherTrainingRecord,
+        addStatutoryRuleVersion,
+        updateStatutoryRuleVersion,
+        bulkImportEmployees,
+        bulkImportMedicalRecords,
+        bulkImportMVTRecords,
+        bulkImportOtherTrainingRecords,
         clearAllRecords,
         purgeMockData,
         resetToDemoData,
